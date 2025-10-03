@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+enum Position {
+  GK
+  DEF
+  MID
+  FWD
+}
+
+enum PlayerStatus {
+  A   // Active
+  I   // Injured (or Inactive)
+}
+
+enum EventType {
+  goal
+  assist
+  appearance
+}
+
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  memberships  LeagueMember[]
+  teams        Team[]
+  ownedLeagues League[]       @relation("LeagueOwner")
+}
+
+model League {
+  id         String         @id @default(cuid())
+  name       String
+  inviteCode String         @unique
+  ownerId    String
+  owner      User           @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime       @default(now())
+  members    LeagueMember[]
+  teams      Team[]
+}
+
+model LeagueMember {
+  id       String @id @default(cuid())
+
+  leagueId String
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role     String // "admin" | "manager"
+
+  @@unique([leagueId, userId])
+  @@index([leagueId])
+  @@index([userId])
+}
+
+model Team {
+  id       String @id @default(cuid())
+  name     String
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  leagueId String
+  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+
+  budget   Int
+  slots    SquadSlot[]
+  scores   GameweekScore[]
+
+  @@unique([userId, leagueId]) // one team per user per league (tweak if you want multiple)
+  @@index([userId, leagueId])
+}
+
+model Player {
+  id       String       @id @default(cuid())
+  teamName String
+  position Position
+  price    Int
+  status   PlayerStatus
+  events   ScoreEvent[]
+  slots    SquadSlot[]
+}
+
+model SquadSlot {
+  id        String @id @default(cuid())
+
+  teamId    String
+  team      Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  playerId  String
+  player    Player @relation(fields: [playerId], references: [id])
+
+  slotLabel String // e.g., "GK1", "DEF1"
+  @@unique([teamId, slotLabel])
+  @@index([playerId])
+}
+
+model Fixture {
+  id        String   @id @default(cuid())
+  homeTeam  String
+  awayTeam  String
+  kickoffAt DateTime
+  gw        Int
+  events    ScoreEvent[]
+  @@index([gw])
+}
+
+model ScoreEvent {
+  id        String  @id @default(cuid())
+
+  fixtureId String
+  fixture   Fixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+
+  playerId  String
+  player    Player  @relation(fields: [playerId], references: [id])
+
+  type      EventType
+  value     Int
+  createdAt DateTime @default(now())
+
+  @@index([fixtureId])
+  @@index([playerId])
+}
+
+model GameweekScore {
+  id     String @id @default(cuid())
+
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  gw     Int
+  total  Int
+
+  @@unique([teamId, gw])
+  @@index([teamId])
+}
