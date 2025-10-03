@@ -4,9 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
+  
   { href: "/", label: "Home" },
-  { href: "/about", label: "About" },
+  { href: "/pick-team", label: "Pick Team" },
+  { href: "/leagues", label: "Leagues" },
+  
+  { href: "/transfers", label: "Transfers" },
+  { href: "/rules", label: "Rules" },
 ];
+
 
 export default function Nav() {
   const pathname = usePathname();
