@@ -1,15 +1,12 @@
 // src/lib/prisma.ts
-import 'server-only'
+import { PrismaClient } from '@prisma/client'
 
-// If your tsconfig has "@/": "src/*" alias:
-import { PrismaClient } from '@/generated/prisma'
-
-// If that import errors, use this instead:
-// import { PrismaClient } from '../generated/prisma'
-
-const g = global as unknown as { prisma?: PrismaClient }
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
 
 export const prisma =
-  g.prisma ?? new PrismaClient({ log: ['error'] })
+  globalForPrisma.prisma ||
+  new PrismaClient({
+    log: ['query', 'error', 'warn'],
+  })
 
-if (process.env.NODE_ENV !== 'production') g.prisma = prisma
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
