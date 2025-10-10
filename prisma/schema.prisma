@@ -9,10 +9,10 @@ datasource db {
 }
 enum Position {
   GK
-  DEF
-  MID
-  FWD
+  OUT
 }
+
+
 
 enum PlayerStatus {
   A   // Active
@@ -83,12 +83,15 @@ model Team {
 
 model Player {
   id       String       @id @default(cuid())
+  name     String
   teamName String
   position Position
   price    Int
   status   PlayerStatus
   events   ScoreEvent[]
   slots    SquadSlot[]
+
+  @@unique([name, teamName]) // optional but useful for upserts
 }
 
 model SquadSlot {

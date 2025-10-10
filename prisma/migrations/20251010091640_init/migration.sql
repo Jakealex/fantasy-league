@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "Position" AS ENUM ('GK', 'DEF', 'MID', 'FWD');
+CREATE TYPE "Position" AS ENUM ('GK', 'OUT');
 
 -- CreateEnum
 CREATE TYPE "PlayerStatus" AS ENUM ('A', 'I');
@@ -52,6 +52,7 @@ CREATE TABLE "Team" (
 -- CreateTable
 CREATE TABLE "Player" (
     "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
     "teamName" TEXT NOT NULL,
     "position" "Position" NOT NULL,
     "price" INTEGER NOT NULL,
@@ -123,6 +124,9 @@ CREATE INDEX "Team_userId_leagueId_idx" ON "Team"("userId", "leagueId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Team_userId_leagueId_key" ON "Team"("userId", "leagueId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Player_name_teamName_key" ON "Player"("name", "teamName");
 
 -- CreateIndex
 CREATE INDEX "SquadSlot_playerId_idx" ON "SquadSlot"("playerId");
