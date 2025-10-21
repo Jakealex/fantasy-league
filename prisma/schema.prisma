@@ -86,7 +86,7 @@ model Player {
   name     String
   teamName String
   position Position
-  price    Int
+  price    Float 
   status   PlayerStatus
   events   ScoreEvent[]
   slots    SquadSlot[]
