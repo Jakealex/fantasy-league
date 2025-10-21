@@ -50,24 +50,30 @@ export default async function TransfersPage() {
     },
   });
 
-  // Ownership %
-  const [slotCounts, totalTeams] = await Promise.all([
-    prisma.squadSlot.groupBy({ by: ["playerId"], _count: { playerId: true } }),
-    prisma.team.count(),
-  ]);
-  const ownedMap = new Map<number | string, number>(
-    slotCounts.map((g: any) => [
-      g.playerId,
-      totalTeams ? (g._count.playerId / totalTeams) * 100 : 0,
-    ])
-  );
+ // Ownership %
+type SlotCount = { playerId: string | number; _count: { playerId: number } };
 
-  // Upcoming fixtures
-  const upcomingFixtures = (await prisma.fixture.findMany({
-    where: { kickoffAt: { gt: new Date() } },
-    orderBy: { kickoffAt: "asc" },
-    take: 200,
-  })) as UpcomingFixture[];
+const [slotCounts, totalTeams] = (await Promise.all([
+  prisma.squadSlot.groupBy({
+    by: ["playerId"],
+    _count: { playerId: true },
+  }),
+  prisma.team.count(),
+])) as [SlotCount[], number];
+
+const ownedMap = new Map<string | number, number>(
+  slotCounts.map((g) => [
+    g.playerId,
+    totalTeams ? (g._count.playerId / totalTeams) * 100 : 0,
+  ])
+);
+
+// Upcoming fixtures
+const upcomingFixtures = (await prisma.fixture.findMany({
+  where: { kickoffAt: { gt: new Date() } },
+  orderBy: { kickoffAt: "asc" },
+  take: 200,
+})) as UpcomingFixture[];
 
   const pickNextFixture = (teamName: string): string | undefined => {
     const fx = upcomingFixtures.find(
