@@ -1,86 +1,159 @@
-import { prisma } from "@/lib/prisma";
+// src/app/transfers/page.tsx
+import prisma from "@/lib/prisma";
 
-// Mirror your schema enums without importing Prisma types
-type PositionCode = "GK" | "OUT";
-type StatusCode = "A" | "I";
+import TransfersClient from "./transfer-clients";
 
-type UIPlayer = {
-  id: string;
+type BasePlayer = {
+  id: number | string;
   name: string;
   teamName: string;
-  position: PositionCode;
+  position: string;
   price: number;
-  status: StatusCode;
+  status: string;
 };
 
-function positionLabel(pos: PositionCode): string {
-  return pos === "GK" ? "Goalkeeper" : "Outfield";
-}
-function statusLabel(s: StatusCode): string {
-  return s === "A" ? "Active" : "Injured";
-}
+type UIPlayer = BasePlayer & {
+  ownedPct: number;
+  nextFixture?: string;
+  totalPoints: number;
+  roundPoints: number;
+  goals: number;
+  assists: number;
+  cleanSheets?: number;
+};
+
+type UpcomingFixture = {
+  homeTeam: string;
+  awayTeam: string;
+  kickoffAt: Date;
+};
 
 export default async function TransfersPage() {
-  const players = (await prisma.player.findMany({
+  // 1) Load active team & slots (server-side only, not passed to client)
+ const team = await prisma.team.findFirst({
+  include: { slots: { include: { player: true } } },
+});
+
+
+  // 2) Load all available players
+  const players = await prisma.player.findMany({
     orderBy: [{ teamName: "asc" }, { name: "asc" }],
-  })) as UIPlayer[];
+    select: {
+      id: true,
+      name: true,
+      teamName: true,
+      position: true,
+      price: true,
+      status: true,
+    },
+  });
 
+  // 3) Compute ownership percentage
+  const [slotCounts, totalTeams] = await Promise.all([
+    prisma.squadSlot.groupBy({
+      by: ["playerId"],
+      _count: { playerId: true },
+    }),
+    prisma.team.count(),
+  ]);
+
+  const ownedMap = new Map<number | string, number>(
+    slotCounts.map(
+      (g: { playerId: number | string; _count: { playerId: number } }) => [
+        g.playerId,
+        totalTeams ? (g._count.playerId / totalTeams) * 100 : 0,
+      ]
+    )
+  );
+
+  // 4) Get upcoming fixtures (for next opponent display)
+  const upcomingFixtures = (await prisma.fixture.findMany({
+    where: { kickoffAt: { gt: new Date() } },
+    orderBy: { kickoffAt: "asc" },
+    take: 200,
+  })) as UpcomingFixture[];
+
+  const pickNextFixture = (teamName: string): string | undefined => {
+    const fx = upcomingFixtures.find(
+      (f: UpcomingFixture) => f.homeTeam === teamName || f.awayTeam === teamName
+    );
+    if (!fx) return undefined;
+    const opp = fx.homeTeam === teamName ? fx.awayTeam : fx.homeTeam;
+    return `${opp} (${fx.homeTeam === teamName ? "H" : "A"})`;
+  };
+
+  // 5) Server-side UIPlayer list
+  const uiPlayers: UIPlayer[] = players.map((p: BasePlayer) => ({
+    ...p,
+    ownedPct: Math.round(((ownedMap.get(p.id) ?? 0) as number) * 10) / 10,
+    nextFixture: pickNextFixture(p.teamName),
+    totalPoints: 0,
+    roundPoints: 0,
+    goals: 0,
+    assists: 0,
+    cleanSheets: p.position === "GK" ? 0 : undefined,
+  }));
+
+  // 6) Adapt to client component props
+  type ClientPosition = "GK" | "OUT";
+  type ClientStatus = "A" | "I";
+
+  type ClientPlayer = {
+    id: string;
+    name: string;
+    teamName: string;
+    position: ClientPosition;
+    price: number;
+    status: ClientStatus;
+    ownedPct: number;
+    nextFixture?: string;
+    totalPoints?: number;
+    roundPoints?: number;
+    goals?: number;
+    assists?: number;
+    cleanSheets?: number;
+  };
+
+  const playersForClient: ClientPlayer[] = uiPlayers.map((p) => ({
+    id: String(p.id),
+    name: p.name,
+    teamName: p.teamName,
+    position: (p.position === "GK" ? "GK" : "OUT") as ClientPosition,
+    price: p.price,
+    status: (p.status === "I" ? "I" : "A") as ClientStatus,
+    ownedPct: Number.isFinite(p.ownedPct) ? p.ownedPct : 0,
+    nextFixture: p.nextFixture,
+    totalPoints: p.totalPoints,
+    roundPoints: p.roundPoints,
+    goals: p.goals,
+    assists: p.assists,
+    cleanSheets: p.cleanSheets,
+  }));
+
+  // 7) Create squad structure for display
+  const labelOrder = ["GK1", "OUT1", "OUT2", "OUT3", "OUT4"] as const;
+
+  type ClientSquadSlot = {
+    slotLabel: string;
+    player?: { id: string; name: string };
+  };
+
+  const squadForClient: ClientSquadSlot[] = labelOrder.map((label) => {
+    const found = team.slots.find(
+      (s: { slotLabel: string; player?: BasePlayer }) => s.slotLabel === label
+    );
+    return found?.player
+      ? {
+          slotLabel: label,
+          player: { id: String(found.player.id), name: found.player.name },
+        }
+      : { slotLabel: label, player: undefined };
+  });
+
+  // 8) Render Transfers client component (no team prop)
   return (
-    <main className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Transfers</h1>
-
-      <section className="mb-4">
-        <h2 className="text-xl font-semibold">Available Players</h2>
-        <p className="text-sm text-gray-600">
-          Browse and select players to transfer into your squad.
-        </p>
-      </section>
-
-      {players.length === 0 ? (
-        <p className="text-gray-600">No players found.</p>
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {players.map((p: UIPlayer) => (
-            <li
-              key={p.id}
-              className="rounded-lg border p-4 shadow-sm hover:shadow transition"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-lg">{p.name}</h3>
-                <span className="text-sm font-mono">
-                  R{p.price.toFixed( p.price % 1 ? 1 : 0 )}
-                </span>
-              </div>
-              <p className="text-sm text-gray-700 mt-1">
-                {positionLabel(p.position)} • {p.teamName}
-              </p>
-              <p className="text-xs mt-2">
-                <span
-                  className={
-                    "inline-block rounded px-2 py-0.5 " +
-                    (p.status === "A"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800")
-                  }
-                >
-                  {statusLabel(p.status)}
-                </span>
-              </p>
-
-              {/* Placeholder action button for later */}
-              <div className="mt-3">
-                <button
-                  className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                  disabled
-                  title="Hook this up to your transfer action later"
-                >
-                  Add to Squad
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </main>
+    <div className="p-6">
+      <TransfersClient players={playersForClient} squad={squadForClient} />
+    </div>
   );
 }
