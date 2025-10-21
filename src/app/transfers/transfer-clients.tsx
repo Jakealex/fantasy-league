@@ -27,11 +27,12 @@ export default function TransfersClient({
   squad: SquadSlot[];
   players: Player[];
 }) {
+  // ---------- Filters / sort ----------
   const [q, setQ] = useState("");
   const [team, setTeam] = useState<string>("All");
   const [pos, setPos] = useState<"All" | "GK" | "OUT">("All");
   const [status, setStatus] = useState<"All" | "A" | "I">("All");
-  const [sort, setSort] = useState<string>("price-desc");
+  const [sort, setSort] = useState<string>("%owned-desc");
 
   const teams = useMemo(
     () => Array.from(new Set(players.map((p) => p.teamName))).sort(),
@@ -53,7 +54,7 @@ export default function TransfersClient({
       "name-desc": (a, b) => b.name.localeCompare(a.name),
       "team-asc": (a, b) => a.teamName.localeCompare(b.teamName),
       "team-desc": (a, b) => b.teamName.localeCompare(a.teamName),
-      "owned-desc": (a, b) => (b.ownedPct ?? 0) - (a.ownedPct ?? 0),
+      "%owned-desc": (a, b) => (b.ownedPct ?? 0) - (a.ownedPct ?? 0),
       "points-desc": (a, b) => (b.totalPoints ?? 0) - (a.totalPoints ?? 0),
       "assists-desc": (a, b) => (b.assists ?? 0) - (a.assists ?? 0),
       "goals-desc": (a, b) => (b.goals ?? 0) - (a.goals ?? 0),
@@ -62,6 +63,63 @@ export default function TransfersClient({
     rows.sort(cmp[sort] ?? cmp["price-desc"]);
     return rows;
   }, [players, q, team, pos, status, sort]);
+
+  // ---------- Optimistic Add-to-Squad ----------
+  const [localSquad, setLocalSquad] = useState<SquadSlot[]>(squad);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [justAddedIds, setJustAddedIds] = useState<Set<string>>(new Set());
+
+  const isInSquad = (pid: string) =>
+    localSquad.some((s) => s.player?.id === pid);
+
+  const nextOpenSlotIndex = (position: "GK" | "OUT") => {
+    const labelPrefix = position === "GK" ? "GK" : "OUT";
+    return localSquad.findIndex(
+      (s) => s.slotLabel.startsWith(labelPrefix) && !s.player
+    ); // -1 if none
+  };
+
+  async function handleAdd(p: Player) {
+    if (isInSquad(p.id)) return;
+
+    const idx = nextOpenSlotIndex(p.position);
+    if (idx === -1) {
+      alert(p.position === "GK" ? "Goalkeeper slot is full" : "Outfield slots are full");
+      return;
+    }
+
+    // snapshot for rollback
+    const prev = localSquad;
+    // optimistic apply
+    const next = [...localSquad];
+    next[idx] = { ...next[idx], player: { id: p.id, name: p.name } };
+    setLocalSquad(next);
+    setPendingId(p.id);
+
+    try {
+      // Call the server action using FormData for max compatibility
+      const fd = new FormData();
+      fd.append("playerId", p.id);
+      await addToSquadAction(fd);
+
+      // brief success badge
+      setJustAddedIds(new Set([...justAddedIds, p.id]));
+      setTimeout(() => {
+        setJustAddedIds((prevSet) => {
+          const s = new Set(prevSet);
+          s.delete(p.id);
+          return s;
+        });
+      }, 1200);
+    } catch (err) {
+      console.error(err);
+      // rollback on error
+      setLocalSquad(prev);
+      alert("Could not add player. Please try again.");
+    } finally {
+      setPendingId(null);
+    }
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -73,16 +131,16 @@ export default function TransfersClient({
           <div className="space-y-3">
             {/* GK row */}
             <SlotRow label="Goalkeeper">
-              <SlotCard slot={squad.find((s) => s.slotLabel === "GK1")} />
+              <SlotCard slot={localSquad.find((s) => s.slotLabel === "GK1")} />
             </SlotRow>
 
             {/* Outfield rows: 4 slots */}
             <SlotRow label="Outfield">
               <div className="grid grid-cols-2 gap-3">
-                <SlotCard slot={squad.find((s) => s.slotLabel === "OUT1")} />
-                <SlotCard slot={squad.find((s) => s.slotLabel === "OUT2")} />
-                <SlotCard slot={squad.find((s) => s.slotLabel === "OUT3")} />
-                <SlotCard slot={squad.find((s) => s.slotLabel === "OUT4")} />
+                <SlotCard slot={localSquad.find((s) => s.slotLabel === "OUT1")} />
+                <SlotCard slot={localSquad.find((s) => s.slotLabel === "OUT2")} />
+                <SlotCard slot={localSquad.find((s) => s.slotLabel === "OUT3")} />
+                <SlotCard slot={localSquad.find((s) => s.slotLabel === "OUT4")} />
               </div>
             </SlotRow>
           </div>
@@ -99,9 +157,7 @@ export default function TransfersClient({
               <label className="block text-xs text-gray-600 mb-1">Search</label>
               <input
                 value={q}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setQ(e.target.value)
-                }
+                onChange={(e) => setQ(e.target.value)}
                 placeholder="Search for player..."
                 className="w-full rounded border px-2 py-1"
               />
@@ -112,9 +168,7 @@ export default function TransfersClient({
               <select
                 className="rounded border px-2 py-1"
                 value={team}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  setTeam(e.target.value)
-                }
+                onChange={(e) => setTeam(e.target.value)}
               >
                 <option>All</option>
                 {teams.map((t) => (
@@ -124,13 +178,11 @@ export default function TransfersClient({
             </div>
 
             <div>
-              <label className="block text-xs text-gray-600 mb-1">
-                Position
-              </label>
+              <label className="block text-xs text-gray-600 mb-1">Position</label>
               <select
                 className="rounded border px-2 py-1"
                 value={pos}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                onChange={(e) =>
                   setPos(e.target.value as "All" | "GK" | "OUT")
                 }
               >
@@ -145,7 +197,7 @@ export default function TransfersClient({
               <select
                 className="rounded border px-2 py-1"
                 value={status}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                onChange={(e) =>
                   setStatus(e.target.value as "All" | "A" | "I")
                 }
               >
@@ -160,17 +212,15 @@ export default function TransfersClient({
               <select
                 className="rounded border px-2 py-1"
                 value={sort}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  setSort(e.target.value)
-                }
+                onChange={(e) => setSort(e.target.value)}
               >
+                <option value="%owned-desc">% Owned (high → low)</option>
                 <option value="price-desc">Price (high → low)</option>
                 <option value="price-asc">Price (low → high)</option>
                 <option value="name-asc">Name (A–Z)</option>
                 <option value="name-desc">Name (Z–A)</option>
                 <option value="team-asc">Team (A–Z)</option>
                 <option value="team-desc">Team (Z–A)</option>
-                <option value="owned-desc">% Owned (high → low)</option>
                 <option value="points-desc">Total points (high → low)</option>
                 <option value="assists-desc">Assists (high → low)</option>
                 <option value="goals-desc">Goals (high → low)</option>
@@ -181,68 +231,85 @@ export default function TransfersClient({
         </div>
 
         <ul className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {filtered.map((p) => (
-            <li key={p.id} className="rounded-lg border p-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-semibold">{p.name}</div>
-                  <div className="text-xs text-gray-600">
-                    {p.position === "GK" ? "Goalkeeper" : "Outfield"} •{" "}
-                    {p.teamName}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-mono">R{p.price.toFixed(1)}</div>
-                  <div className="text-xs text-gray-600">
-                    {p.ownedPct.toFixed(1)}% owned
-                  </div>
-                </div>
-              </div>
+          {filtered.map((p) => {
+            const disabled =
+              pendingId === p.id ||
+              isInSquad(p.id) ||
+              nextOpenSlotIndex(p.position) === -1;
 
-              <details className="mt-2">
-                <summary className="cursor-pointer text-xs text-gray-700">
-                  i Info
-                </summary>
-                <div className="mt-1 text-xs space-y-1">
+            const label =
+              pendingId === p.id
+                ? "Adding..."
+                : justAddedIds.has(p.id)
+                ? "Added ✓"
+                : isInSquad(p.id)
+                ? "In Squad"
+                : "Add to Squad";
+
+            return (
+              <li key={p.id} className="rounded-lg border p-3">
+                <div className="flex items-center justify-between">
                   <div>
-                    <b>Fixture:</b> {p.nextFixture ?? "TBD"}
+                    <div className="font-semibold">{p.name}</div>
+                    <div className="text-xs text-gray-600">
+                      {p.position === "GK" ? "Goalkeeper" : "Outfield"} • {p.teamName}
+                    </div>
                   </div>
-                  <div>
-                    <b>Status:</b> {p.status === "A" ? "Active" : "Injured"}
-                  </div>
-                  <div>
-                    <b>Total points:</b> {p.totalPoints ?? 0}
-                  </div>
-                  <div>
-                    <b>Round points:</b> {p.roundPoints ?? 0}
-                  </div>
-                  <div>
-                    <b>Goals:</b> {p.goals ?? 0} • <b>Assists:</b> {p.assists ?? 0}
-                    {p.position === "GK" ? (
-                      <>
-                        {" "}
-                        • <b>Clean sheets:</b> {p.cleanSheets ?? 0}
-                      </>
-                    ) : null}
-                  </div>
-                  <div className="text-[10px] text-gray-500">
-                    * Some stats are placeholders until scoring is wired.
+                  <div className="text-right">
+                    <div className="text-sm font-mono">R{p.price.toFixed(1)}</div>
+                    <div className="text-xs text-gray-600">
+                      {p.ownedPct.toFixed(1)}% owned
+                    </div>
                   </div>
                 </div>
-              </details>
 
-              {/* ✅ Correct Form for Server Action */}
-              <form action={addToSquadAction} className="mt-2">
-                <input type="hidden" name="playerId" value={p.id} />
-                <button
-                  type="submit"
-                  className="rounded border px-3 py-1 text-sm hover:bg-gray-50"
-                >
-                  Add to Squad
-                </button>
-              </form>
-            </li>
-          ))}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs text-gray-700">
+                    i Info
+                  </summary>
+                  <div className="mt-1 text-xs space-y-1">
+                    <div>
+                      <b>Fixture:</b> {p.nextFixture ?? "TBD"}
+                    </div>
+                    <div>
+                      <b>Status:</b> {p.status === "A" ? "Active" : "Injured"}
+                    </div>
+                    <div>
+                      <b>Total points:</b> {p.totalPoints ?? 0}
+                    </div>
+                    <div>
+                      <b>Round points:</b> {p.roundPoints ?? 0}
+                    </div>
+                    <div>
+                      <b>Goals:</b> {p.goals ?? 0} • <b>Assists:</b> {p.assists ?? 0}
+                      {p.position === "GK" ? (
+                        <>
+                          {" "}
+                          • <b>Clean sheets:</b> {p.cleanSheets ?? 0}
+                        </>
+                      ) : null}
+                    </div>
+                    <div className="text-[10px] text-gray-500">
+                      * Some stats are placeholders until scoring is wired.
+                    </div>
+                  </div>
+                </details>
+
+                <div className="mt-2">
+                  <button
+                    onClick={() => handleAdd(p)}
+                    disabled={disabled}
+                    className={
+                      "rounded border px-3 py-1 text-sm " +
+                      (disabled ? "opacity-60 cursor-not-allowed" : "hover:bg-gray-50")
+                    }
+                  >
+                    {label}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </section>
     </div>
