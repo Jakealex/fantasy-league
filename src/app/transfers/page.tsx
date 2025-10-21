@@ -1,6 +1,5 @@
 // src/app/transfers/page.tsx
 import prisma from "@/lib/prisma";
-
 import TransfersClient from "./transfer-clients";
 
 type BasePlayer = {
@@ -29,13 +28,16 @@ type UpcomingFixture = {
 };
 
 export default async function TransfersPage() {
-  // 1) Load active team & slots (server-side only, not passed to client)
- const team = await prisma.team.findFirst({
-  include: { slots: { include: { player: true } } },
-});
+  // Load a team and its slots
+  const team = await prisma.team.findFirst({
+    include: { slots: { include: { player: true } } },
+  });
 
+  if (!team) {
+    return <div className="p-6">No team found.</div>;
+  }
 
-  // 2) Load all available players
+  // Players
   const players = await prisma.player.findMany({
     orderBy: [{ teamName: "asc" }, { name: "asc" }],
     select: {
@@ -48,25 +50,19 @@ export default async function TransfersPage() {
     },
   });
 
-  // 3) Compute ownership percentage
+  // Ownership %
   const [slotCounts, totalTeams] = await Promise.all([
-    prisma.squadSlot.groupBy({
-      by: ["playerId"],
-      _count: { playerId: true },
-    }),
+    prisma.squadSlot.groupBy({ by: ["playerId"], _count: { playerId: true } }),
     prisma.team.count(),
   ]);
-
   const ownedMap = new Map<number | string, number>(
-    slotCounts.map(
-      (g: { playerId: number | string; _count: { playerId: number } }) => [
-        g.playerId,
-        totalTeams ? (g._count.playerId / totalTeams) * 100 : 0,
-      ]
-    )
+    slotCounts.map((g: any) => [
+      g.playerId,
+      totalTeams ? (g._count.playerId / totalTeams) * 100 : 0,
+    ])
   );
 
-  // 4) Get upcoming fixtures (for next opponent display)
+  // Upcoming fixtures
   const upcomingFixtures = (await prisma.fixture.findMany({
     where: { kickoffAt: { gt: new Date() } },
     orderBy: { kickoffAt: "asc" },
@@ -75,14 +71,14 @@ export default async function TransfersPage() {
 
   const pickNextFixture = (teamName: string): string | undefined => {
     const fx = upcomingFixtures.find(
-      (f: UpcomingFixture) => f.homeTeam === teamName || f.awayTeam === teamName
+      f => f.homeTeam === teamName || f.awayTeam === teamName
     );
     if (!fx) return undefined;
     const opp = fx.homeTeam === teamName ? fx.awayTeam : fx.homeTeam;
     return `${opp} (${fx.homeTeam === teamName ? "H" : "A"})`;
   };
 
-  // 5) Server-side UIPlayer list
+  // Build UI players
   const uiPlayers: UIPlayer[] = players.map((p: BasePlayer) => ({
     ...p,
     ownedPct: Math.round(((ownedMap.get(p.id) ?? 0) as number) * 10) / 10,
@@ -94,10 +90,9 @@ export default async function TransfersPage() {
     cleanSheets: p.position === "GK" ? 0 : undefined,
   }));
 
-  // 6) Adapt to client component props
+  // Adapt to client types
   type ClientPosition = "GK" | "OUT";
   type ClientStatus = "A" | "I";
-
   type ClientPlayer = {
     id: string;
     name: string;
@@ -114,7 +109,7 @@ export default async function TransfersPage() {
     cleanSheets?: number;
   };
 
-  const playersForClient: ClientPlayer[] = uiPlayers.map((p) => ({
+  const playersForClient: ClientPlayer[] = uiPlayers.map(p => ({
     id: String(p.id),
     name: p.name,
     teamName: p.teamName,
@@ -130,30 +125,36 @@ export default async function TransfersPage() {
     cleanSheets: p.cleanSheets,
   }));
 
-  // 7) Create squad structure for display
-  const labelOrder = ["GK1", "OUT1", "OUT2", "OUT3", "OUT4"] as const;
+  // Squad slots for client
+  // Squad slots for client
+const labelOrder = ["GK1", "OUT1", "OUT2", "OUT3", "OUT4"] as const;
 
-  type ClientSquadSlot = {
-    slotLabel: string;
-    player?: { id: string; name: string };
-  };
+type SlotWithPlayer = {
+  slotLabel: string;
+  player: { id: string | number; name: string } | null;
+};
 
-  const squadForClient: ClientSquadSlot[] = labelOrder.map((label) => {
-    const found = team.slots.find(
-      (s: { slotLabel: string; player?: BasePlayer }) => s.slotLabel === label
-    );
-    return found?.player
-      ? {
-          slotLabel: label,
-          player: { id: String(found.player.id), name: found.player.name },
-        }
-      : { slotLabel: label, player: undefined };
-  });
-
-  // 8) Render Transfers client component (no team prop)
-  return (
-    <div className="p-6">
-      <TransfersClient players={playersForClient} squad={squadForClient} />
-    </div>
+const squadForClient = labelOrder.map((label) => {
+  const found = (team.slots as unknown as SlotWithPlayer[]).find(
+    (s: SlotWithPlayer) => s.slotLabel === label
   );
+
+  return found?.player
+    ? {
+        slotLabel: label,
+        player: { id: String(found.player.id), name: found.player.name },
+      }
+    : { slotLabel: label, player: undefined };
+});
+
+console.log("TRANSFERS PAGE DATA", {
+  playersForClient: playersForClient.length,
+  squadForClient: squadForClient.length,
+});
+
+return (
+  <div className="p-6">
+    <TransfersClient players={playersForClient} squad={squadForClient} />
+  </div>
+);
 }

@@ -15,7 +15,7 @@ async function getActiveTeam() {
 }
 
 const GK_SLOTS = ["GK1", "GK2"] as const;
-// NOTE: explicit type instead of `as const` (fixes ts(1355))
+// explicit string[] (avoid const assertion warning on Vercel)
 const OUT_SLOTS: string[] = Array.from({ length: 13 }, (_, i) => `OUT${i + 1}`);
 
 function nextFreeSlotLabel(isGK: boolean, used: string[]): string | null {
@@ -26,44 +26,31 @@ function nextFreeSlotLabel(isGK: boolean, used: string[]): string | null {
   return null;
 }
 
-export async function addToSquad(playerId: string): Promise<void> {
+/** Internal core (NOT exported) */
+async function _addToSquadCore(playerId: string): Promise<void> {
   if (!playerId) throw new Error("Missing playerId");
 
   const team = await getActiveTeam();
 
-  // Load the player (need price, position)
-  const player = await prisma.player.findUnique({
-    where: { id: playerId },
-  });
+  const player = await prisma.player.findUnique({ where: { id: playerId } });
   if (!player) throw new Error("Player not found");
 
-  // Basic validation
   const alreadyInSquad = await prisma.squadSlot.findFirst({
     where: { teamId: team.id, playerId: player.id },
   });
   if (alreadyInSquad) throw new Error("Player already in your squad");
 
-  if (team.budget < player.price) {
-    throw new Error("Not enough budget");
-  }
+  if (team.budget < player.price) throw new Error("Not enough budget");
 
-  // Type 's' to avoid implicit any
   const usedLabels = team.slots.map((s: { slotLabel: string }) => s.slotLabel);
 
   const isGK = player.position === "GK";
   const slotLabel = nextFreeSlotLabel(isGK, usedLabels);
-  if (!slotLabel) {
-    throw new Error(isGK ? "No GK slots free" : "No OUT slots free");
-  }
+  if (!slotLabel) throw new Error(isGK ? "No GK slots free" : "No OUT slots free");
 
-  // Atomic change: create slot + decrement budget
   await prisma.$transaction([
     prisma.squadSlot.create({
-      data: {
-        teamId: team.id,
-        playerId: player.id,
-        slotLabel,
-      },
+      data: { teamId: team.id, playerId: player.id, slotLabel },
     }),
     prisma.team.update({
       where: { id: team.id },
@@ -72,4 +59,13 @@ export async function addToSquad(playerId: string): Promise<void> {
   ]);
 
   revalidatePath("/transfers");
+}
+
+/** ✅ Server Action for `<form action={...}>` */
+export async function addToSquadAction(formData: FormData): Promise<void> {
+  const playerId = formData.get("playerId");
+  if (typeof playerId !== "string" || !playerId) {
+    throw new Error("Invalid playerId");
+  }
+  await _addToSquadCore(playerId);
 }

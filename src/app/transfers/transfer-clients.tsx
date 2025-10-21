@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { addToSquadAction } from "./actions";
 
 type SquadSlot = { slotLabel: string; player?: { id: string; name: string } };
 type Player = {
@@ -26,7 +27,6 @@ export default function TransfersClient({
   squad: SquadSlot[];
   players: Player[];
 }) {
-  // Filters / sort
   const [q, setQ] = useState("");
   const [team, setTeam] = useState<string>("All");
   const [pos, setPos] = useState<"All" | "GK" | "OUT">("All");
@@ -99,7 +99,9 @@ export default function TransfersClient({
               <label className="block text-xs text-gray-600 mb-1">Search</label>
               <input
                 value={q}
-                onChange={(e) => setQ(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setQ(e.target.value)
+                }
                 placeholder="Search for player..."
                 className="w-full rounded border px-2 py-1"
               />
@@ -110,7 +112,9 @@ export default function TransfersClient({
               <select
                 className="rounded border px-2 py-1"
                 value={team}
-                onChange={(e) => setTeam(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setTeam(e.target.value)
+                }
               >
                 <option>All</option>
                 {teams.map((t) => (
@@ -120,11 +124,15 @@ export default function TransfersClient({
             </div>
 
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Position</label>
+              <label className="block text-xs text-gray-600 mb-1">
+                Position
+              </label>
               <select
                 className="rounded border px-2 py-1"
                 value={pos}
-                onChange={(e) => setPos(e.target.value as any)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setPos(e.target.value as "All" | "GK" | "OUT")
+                }
               >
                 <option>All</option>
                 <option value="GK">GK</option>
@@ -137,7 +145,9 @@ export default function TransfersClient({
               <select
                 className="rounded border px-2 py-1"
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setStatus(e.target.value as "All" | "A" | "I")
+                }
               >
                 <option>All</option>
                 <option value="A">Active</option>
@@ -150,7 +160,9 @@ export default function TransfersClient({
               <select
                 className="rounded border px-2 py-1"
                 value={sort}
-                onChange={(e) => setSort(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setSort(e.target.value)
+                }
               >
                 <option value="price-desc">Price (high → low)</option>
                 <option value="price-asc">Price (low → high)</option>
@@ -175,42 +187,60 @@ export default function TransfersClient({
                 <div>
                   <div className="font-semibold">{p.name}</div>
                   <div className="text-xs text-gray-600">
-                    {p.position === "GK" ? "Goalkeeper" : "Outfield"} • {p.teamName}
+                    {p.position === "GK" ? "Goalkeeper" : "Outfield"} •{" "}
+                    {p.teamName}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-mono">R{p.price.toFixed(1)}</div>
-                  <div className="text-xs text-gray-600">{p.ownedPct.toFixed(1)}% owned</div>
+                  <div className="text-xs text-gray-600">
+                    {p.ownedPct.toFixed(1)}% owned
+                  </div>
                 </div>
               </div>
 
-              {/* info strip */}
               <details className="mt-2">
                 <summary className="cursor-pointer text-xs text-gray-700">
                   i Info
                 </summary>
                 <div className="mt-1 text-xs space-y-1">
-                  <div><b>Fixture:</b> {p.nextFixture ?? "TBD"}</div>
-                  <div><b>Status:</b> {p.status === "A" ? "Active" : "Injured"}</div>
-                  <div><b>Total points:</b> {p.totalPoints ?? 0}</div>
-                  <div><b>Round points:</b> {p.roundPoints ?? 0}</div>
-                  <div><b>Goals:</b> {p.goals ?? 0} • <b>Assists:</b> {p.assists ?? 0}{p.position === "GK" ? <> • <b>Clean sheets:</b> {p.cleanSheets ?? 0}</> : null}</div>
+                  <div>
+                    <b>Fixture:</b> {p.nextFixture ?? "TBD"}
+                  </div>
+                  <div>
+                    <b>Status:</b> {p.status === "A" ? "Active" : "Injured"}
+                  </div>
+                  <div>
+                    <b>Total points:</b> {p.totalPoints ?? 0}
+                  </div>
+                  <div>
+                    <b>Round points:</b> {p.roundPoints ?? 0}
+                  </div>
+                  <div>
+                    <b>Goals:</b> {p.goals ?? 0} • <b>Assists:</b> {p.assists ?? 0}
+                    {p.position === "GK" ? (
+                      <>
+                        {" "}
+                        • <b>Clean sheets:</b> {p.cleanSheets ?? 0}
+                      </>
+                    ) : null}
+                  </div>
                   <div className="text-[10px] text-gray-500">
                     * Some stats are placeholders until scoring is wired.
                   </div>
                 </div>
               </details>
 
-              {/* Hooked up later to server actions */}
-              <div className="mt-2">
+              {/* ✅ Correct Form for Server Action */}
+              <form action={addToSquadAction} className="mt-2">
+                <input type="hidden" name="playerId" value={p.id} />
                 <button
+                  type="submit"
                   className="rounded border px-3 py-1 text-sm hover:bg-gray-50"
-                  disabled
-                  title="Add to Squad coming in the next step"
                 >
                   Add to Squad
                 </button>
-              </div>
+              </form>
             </li>
           ))}
         </ul>
@@ -231,9 +261,18 @@ function SlotRow({ label, children }: { label: string; children: React.ReactNode
 function SlotCard({ slot }: { slot?: SquadSlot }) {
   const empty = !slot?.player;
   return (
-    <div className={"rounded-lg border p-3 flex items-center justify-between " + (empty ? "bg-gray-50 text-gray-500" : "")}>
+    <div
+      className={
+        "rounded-lg border p-3 flex items-center justify-between " +
+        (empty ? "bg-gray-50 text-gray-500" : "")
+      }
+    >
       <div className="text-sm">
-        {empty ? <span className="italic">Empty</span> : <span className="font-medium">{slot?.player?.name}</span>}
+        {empty ? (
+          <span className="italic">Empty</span>
+        ) : (
+          <span className="font-medium">{slot?.player?.name}</span>
+        )}
       </div>
       <div className="text-[11px] text-gray-600">{slot?.slotLabel}</div>
     </div>
