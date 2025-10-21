@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { addToSquadAction } from "./actions";
+import { addToSquadAction, removeFromSquadAction } from "./actions";
 
 type SquadSlot = { slotLabel: string; player?: { id: string; name: string } };
 type Player = {
@@ -64,9 +64,10 @@ export default function TransfersClient({
     return rows;
   }, [players, q, team, pos, status, sort]);
 
-  // ---------- Optimistic Add-to-Squad ----------
+  // ---------- Optimistic state (Add & Remove) ----------
   const [localSquad, setLocalSquad] = useState<SquadSlot[]>(squad);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
   const [justAddedIds, setJustAddedIds] = useState<Set<string>>(new Set());
 
   const isInSquad = (pid: string) =>
@@ -88,21 +89,17 @@ export default function TransfersClient({
       return;
     }
 
-    // snapshot for rollback
     const prev = localSquad;
-    // optimistic apply
     const next = [...localSquad];
     next[idx] = { ...next[idx], player: { id: p.id, name: p.name } };
     setLocalSquad(next);
     setPendingId(p.id);
 
     try {
-      // Call the server action using FormData for max compatibility
       const fd = new FormData();
       fd.append("playerId", p.id);
       await addToSquadAction(fd);
 
-      // brief success badge
       setJustAddedIds(new Set([...justAddedIds, p.id]));
       setTimeout(() => {
         setJustAddedIds((prevSet) => {
@@ -113,11 +110,34 @@ export default function TransfersClient({
       }, 1200);
     } catch (err) {
       console.error(err);
-      // rollback on error
       setLocalSquad(prev);
       alert("Could not add player. Please try again.");
     } finally {
       setPendingId(null);
+    }
+  }
+
+  async function handleRemove(slot: SquadSlot) {
+    if (!slot.player) return;
+    const playerId = slot.player.id;
+
+    const prev = localSquad;
+    const next = localSquad.map((s) =>
+      s.slotLabel === slot.slotLabel ? { ...s, player: undefined } : s
+    );
+    setLocalSquad(next);
+    setPendingRemoveId(playerId);
+
+    try {
+      const fd = new FormData();
+      fd.append("playerId", playerId);
+      await removeFromSquadAction(fd);
+    } catch (err) {
+      console.error(err);
+      setLocalSquad(prev);
+      alert("Could not remove player. Please try again.");
+    } finally {
+      setPendingRemoveId(null);
     }
   }
 
@@ -131,16 +151,24 @@ export default function TransfersClient({
           <div className="space-y-3">
             {/* GK row */}
             <SlotRow label="Goalkeeper">
-              <SlotCard slot={localSquad.find((s) => s.slotLabel === "GK1")} />
+              <SlotCard
+                slot={localSquad.find((s) => s.slotLabel === "GK1")}
+                onRemove={handleRemove}
+                pendingRemoveId={pendingRemoveId}
+              />
             </SlotRow>
 
             {/* Outfield rows: 4 slots */}
             <SlotRow label="Outfield">
               <div className="grid grid-cols-2 gap-3">
-                <SlotCard slot={localSquad.find((s) => s.slotLabel === "OUT1")} />
-                <SlotCard slot={localSquad.find((s) => s.slotLabel === "OUT2")} />
-                <SlotCard slot={localSquad.find((s) => s.slotLabel === "OUT3")} />
-                <SlotCard slot={localSquad.find((s) => s.slotLabel === "OUT4")} />
+                {["OUT1", "OUT2", "OUT3", "OUT4"].map((lbl) => (
+                  <SlotCard
+                    key={lbl}
+                    slot={localSquad.find((s) => s.slotLabel === lbl)}
+                    onRemove={handleRemove}
+                    pendingRemoveId={pendingRemoveId}
+                  />
+                ))}
               </div>
             </SlotRow>
           </div>
@@ -268,26 +296,13 @@ export default function TransfersClient({
                     i Info
                   </summary>
                   <div className="mt-1 text-xs space-y-1">
-                    <div>
-                      <b>Fixture:</b> {p.nextFixture ?? "TBD"}
-                    </div>
-                    <div>
-                      <b>Status:</b> {p.status === "A" ? "Active" : "Injured"}
-                    </div>
-                    <div>
-                      <b>Total points:</b> {p.totalPoints ?? 0}
-                    </div>
-                    <div>
-                      <b>Round points:</b> {p.roundPoints ?? 0}
-                    </div>
+                    <div><b>Fixture:</b> {p.nextFixture ?? "TBD"}</div>
+                    <div><b>Status:</b> {p.status === "A" ? "Active" : "Injured"}</div>
+                    <div><b>Total points:</b> {p.totalPoints ?? 0}</div>
+                    <div><b>Round points:</b> {p.roundPoints ?? 0}</div>
                     <div>
                       <b>Goals:</b> {p.goals ?? 0} • <b>Assists:</b> {p.assists ?? 0}
-                      {p.position === "GK" ? (
-                        <>
-                          {" "}
-                          • <b>Clean sheets:</b> {p.cleanSheets ?? 0}
-                        </>
-                      ) : null}
+                      {p.position === "GK" ? <> • <b>Clean sheets:</b> {p.cleanSheets ?? 0}</> : null}
                     </div>
                     <div className="text-[10px] text-gray-500">
                       * Some stats are placeholders until scoring is wired.
@@ -325,8 +340,18 @@ function SlotRow({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function SlotCard({ slot }: { slot?: SquadSlot }) {
+function SlotCard({
+  slot,
+  onRemove,
+  pendingRemoveId,
+}: {
+  slot?: SquadSlot;
+  onRemove?: (slot: SquadSlot) => void;
+  pendingRemoveId?: string | null;
+}) {
   const empty = !slot?.player;
+  const removing = !!slot?.player && pendingRemoveId === slot.player.id;
+
   return (
     <div
       className={
@@ -341,7 +366,23 @@ function SlotCard({ slot }: { slot?: SquadSlot }) {
           <span className="font-medium">{slot?.player?.name}</span>
         )}
       </div>
-      <div className="text-[11px] text-gray-600">{slot?.slotLabel}</div>
+
+      <div className="flex items-center gap-2">
+        {!empty && onRemove && slot ? (
+          <button
+            onClick={() => onRemove(slot)}
+            disabled={removing}
+            className={
+              "text-[11px] border rounded px-2 py-1 " +
+              (removing ? "opacity-60 cursor-wait" : "hover:bg-gray-50")
+            }
+            title="Remove from squad"
+          >
+            {removing ? "Removing..." : "Remove"}
+          </button>
+        ) : null}
+        <div className="text-[11px] text-gray-600">{slot?.slotLabel}</div>
+      </div>
     </div>
   );
 }
