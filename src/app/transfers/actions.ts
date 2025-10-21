@@ -1,137 +1,99 @@
+// src/app/transfers/actions.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import type { Player, SquadSlot } from "@/types/fantasy";
 
-/**
- * TODO: replace with real auth + selected league scoping.
- * For now we grab the first team with its slots.
- */
-async function getActiveTeam() {
-  const team = await prisma.team.findFirst({
-    include: { slots: { include: { player: true } } },
+export type ActionState = { ok: boolean; message: string };
+
+const BASE_BUDGET = 34; // keep in sync with page.tsx
+
+// --- helpers (not exported) ---
+async function getTeamForCurrentUser() {
+  // TODO: swap to real auth (session userId). For now use first user/league.
+  const user = await prisma.user.findFirstOrThrow();
+  const league = await prisma.league.findFirstOrThrow({ where: { ownerId: user.id } });
+  const team = await prisma.team.findFirstOrThrow({
+    where: { userId: user.id, leagueId: league.id },
   });
-  if (!team) throw new Error("No team found. Create a Team first.");
   return team;
 }
 
-// If you truly only want 1 GK + 4 OUT, set GK_SLOTS to ["GK1"].
-const GK_SLOTS = ["GK1", "GK2"] as const;
-// explicit string[] (avoid const assertion warning on Vercel)
-const OUT_SLOTS: string[] = Array.from({ length: 13 }, (_, i) => `OUT${i + 1}`);
-
-function nextFreeSlotLabel(isGK: boolean, used: string[]): string | null {
-  const pool = isGK ? GK_SLOTS : OUT_SLOTS;
-  for (const label of pool) {
-    if (!used.includes(label)) return label;
-  }
-  return null;
+function slotPrefixForPosition(pos: Player["position"]): "GK" | "OUT" {
+  return pos === "GK" ? "GK" : "OUT";
 }
 
-/* ------------------------ ADD TO SQUAD (core) ------------------------ */
+// --- exported async server actions ---
+export async function addToSquadAction(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const playerId = String(formData.get("playerId") ?? "");
+  const playerName = String(formData.get("playerName") ?? "");
+  const slotLabel = String(formData.get("slotLabel") ?? "");
 
-async function _addToSquadCore(playerId: string): Promise<void> {
-  if (!playerId) throw new Error("Missing playerId");
+  if (!playerId || !playerName || !slotLabel) {
+    return { ok: false, message: "Missing fields" };
+  }
 
-  const team = await getActiveTeam();
+  const team = await getTeamForCurrentUser();
 
+  // Get player (for price/pos) and current slots
   const player = await prisma.player.findUnique({ where: { id: playerId } });
-  if (!player) throw new Error("Player not found");
+  if (!player) return { ok: false, message: "Player not found" };
 
-  // Prevent duplicates
-  const alreadyInSquad = await prisma.squadSlot.findFirst({
-    where: { teamId: team.id, playerId: player.id },
-  });
-  if (alreadyInSquad) throw new Error("Player already in your squad");
-
-  // Budget check
-  if (team.budget < player.price) throw new Error("Not enough budget");
-
-  // Capacity check
-  const usedLabels = team.slots.map((s: { slotLabel: string }) => s.slotLabel);
-
-  const isGK = player.position === "GK";
-  const slotLabel = nextFreeSlotLabel(isGK, usedLabels);
-  if (!slotLabel) throw new Error(isGK ? "No GK slots free" : "No OUT slots free");
-
-  // Create slot & decrement budget atomically
-  await prisma.$transaction([
-    prisma.squadSlot.create({
-      data: { teamId: team.id, playerId: player.id, slotLabel },
-    }),
-    prisma.team.update({
-      where: { id: team.id },
-      data: { budget: { decrement: player.price } },
-    }),
-  ]);
-
-  revalidatePath("/transfers");
-}
-
-/** ✅ Server Action for <form action={addToSquadAction}> */
-export async function addToSquadAction(formData: FormData): Promise<void> {
-  const playerId = formData.get("playerId");
-  if (typeof playerId !== "string" || !playerId) {
-    throw new Error("Invalid playerId");
-  }
-  await _addToSquadCore(playerId);
-}
-
-/* ----------------------- REMOVE FROM SQUAD ----------------------- */
-
-/**
- * Removes a player from the active team and refunds the budget.
- * Accepts either:
- *  - playerId (preferred), or
- *  - slotLabel (fallback if you wire the left-side remove by slot)
- *
- * Usage from client:
- *   const fd = new FormData();
- *   fd.append("playerId", playerId); // or fd.append("slotLabel", "OUT3")
- *   await removeFromSquadAction(fd);
- */
-export async function removeFromSquadAction(formData: FormData): Promise<void> {
-  const team = await getActiveTeam();
-
-  const playerId = formData.get("playerId");
-  const slotLabel = formData.get("slotLabel");
-
-  if (typeof playerId !== "string" && typeof slotLabel !== "string") {
-    throw new Error("Provide playerId or slotLabel");
-  }
-
-  // Find the slot we’re removing (scoped to the active team)
-  const slot = await prisma.squadSlot.findFirst({
-    where: {
-      teamId: team.id,
-      ...(typeof playerId === "string" ? { playerId } : {}),
-      ...(typeof slotLabel === "string" ? { slotLabel } : {}),
-    },
+  const slots = await prisma.squadSlot.findMany({
+    where: { teamId: team.id },
     include: { player: true },
   });
 
-  if (!slot) {
-    // Nothing to do; treat as success for idempotency
-    return;
+  // Club cap (example: 1 per club; tweak as needed)
+  const fromSameClub = slots.filter((s: typeof slots[number]) => s.player?.teamName === player.teamName).length;
+  if (fromSameClub >= 1) return { ok: false, message: "Too many players from this team." };
+
+  // Slot availability must match position
+  const prefix = slotPrefixForPosition(player.position as Player["position"]);
+ const target = slots.find((s: typeof slots[number]) => s.slotLabel === slotLabel);
+  if (!target || !target.slotLabel.startsWith(prefix)) {
+    return { ok: false, message: "No matching free slot." };
   }
-  if (!slot.player) {
-    // If schema allows null playerId, just delete the empty slot
-    await prisma.squadSlot.delete({ where: { id: slot.id } });
-    revalidatePath("/transfers");
-    return;
-  }
+  if (target.playerId) return { ok: false, message: "Slot already taken." };
 
-  // Refund amount = that player's price
-  const refund = slot.player.price;
+  // Budget check from server truth
+  const spent = slots.reduce((sum: number, s: typeof slots[number]) => sum + (s.player?.price ?? 0), 0);
+  const remaining = BASE_BUDGET - spent;
+  if (remaining < player.price) return { ok: false, message: "Insufficient funds." };
 
-  // Delete slot & increment budget atomically
-  await prisma.$transaction([
-    prisma.squadSlot.delete({ where: { id: slot.id } }),
-    prisma.team.update({
-      where: { id: team.id },
-      data: { budget: { increment: refund } },
-    }),
-  ]);
+  await prisma.squadSlot.update({
+    where: { teamId_slotLabel: { teamId: team.id, slotLabel } },
+    data: { playerId: player.id },
+  });
 
-  revalidatePath("/transfers");
+  return { ok: true, message: "Squad updated" };
+}
+
+export async function removeFromSquadAction(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const slotLabel = String(formData.get("slotLabel") ?? "");
+  if (!slotLabel) return { ok: false, message: "Missing slotLabel" };
+
+  const team = await getTeamForCurrentUser();
+
+  await prisma.squadSlot.update({
+    where: { teamId_slotLabel: { teamId: team.id, slotLabel } },
+    data: { player: { disconnect: true } },
+
+  });
+
+  return { ok: true, message: "Removed from squad" };
+}
+
+// Optional one-arg wrappers if your client imports these:
+export async function addToSquadDirect(formData: FormData): Promise<ActionState> {
+  return addToSquadAction({ ok: false, message: "" }, formData);
+}
+export async function removeFromSquadDirect(formData: FormData): Promise<ActionState> {
+  return removeFromSquadAction({ ok: false, message: "" }, formData);
 }

@@ -1,111 +1,115 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
-
 }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // optional: shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
+
+/* ---------- ENUMS ---------- */
 enum Position {
   GK
   OUT
 }
 
-
-
 enum PlayerStatus {
-  A   // Active
-  I   // Injured (or Inactive)
+  A
+  I
 }
 
-enum EventType {
-  goal
-  assist
-  appearance
-}
-
+/* ---------- MODELS ---------- */
 
 model User {
-  id           String         @id @default(cuid())
-  email        String         @unique
-  passwordHash String
-  createdAt    DateTime       @default(now())
-  memberships  LeagueMember[]
-  teams        Team[]
-  ownedLeagues League[]       @relation("LeagueOwner")
+  id            String         @id @default(cuid())
+  email         String         @unique
+  passwordHash  String
+
+  teams         Team[]
+  leaguesOwned  League[]       @relation("LeagueOwner")
+  memberships   LeagueMember[]
 }
 
 model League {
-  id         String         @id @default(cuid())
+  id         String        @id @default(cuid())
   name       String
-  inviteCode String         @unique
+  inviteCode String        @unique
+
   ownerId    String
-  owner      User           @relation("LeagueOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt  DateTime       @default(now())
-  members    LeagueMember[]
+  owner      User          @relation("LeagueOwner", fields: [ownerId], references: [id])
+
   teams      Team[]
+  members    LeagueMember[]
 }
 
 model LeagueMember {
-  id       String @id @default(cuid())
-
-  leagueId String
-  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  id       String  @id @default(cuid())
 
   userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leagueId String
+  role     String
 
-  role     String // "admin" | "manager"
+  user     User    @relation(fields: [userId], references: [id])
+  league   League  @relation(fields: [leagueId], references: [id])
 
   @@unique([leagueId, userId])
-  @@index([leagueId])
-  @@index([userId])
 }
 
 model Team {
-  id       String @id @default(cuid())
-  name     String
+  id        String     @id @default(cuid())
+  name      String
 
-  userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
 
-  leagueId String
-  league   League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  leagueId  String
+  league    League     @relation(fields: [leagueId], references: [id])
 
-  budget   Int
-  slots    SquadSlot[]
-  scores   GameweekScore[]
+  budget    Float      @default(34)
 
-  @@unique([userId, leagueId]) // one team per user per league (tweak if you want multiple)
-  @@index([userId, leagueId])
+  slots           SquadSlot[]
+  gameweekScores  GameweekScore[]
+
+  @@unique([userId, leagueId]) // ✅ add this line
 }
 
-model Player {
-  id       String       @id @default(cuid())
-  name     String
-  teamName String
-  position Position
-  price    Float 
-  status   PlayerStatus
-  events   ScoreEvent[]
-  slots    SquadSlot[]
 
-  @@unique([name, teamName]) // optional but useful for upserts
+model Player {
+  id          String        @id @default(cuid())
+  name        String
+  teamName    String
+  position    Position
+  price       Float
+  status      PlayerStatus
+
+  ownedPct    Float?
+  nextFixture String?
+  totalPoints Int?
+  roundPoints Int?
+  goals       Int?
+  assists     Int?
+  cleanSheets Int?
+
+  slots       SquadSlot[]
+  events      ScoreEvent[]
+
+  @@unique([name, teamName])
 }
 
 model SquadSlot {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
 
   teamId    String
-  team      Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  team      Team    @relation(fields: [teamId], references: [id])
 
-  playerId  String
-  player    Player @relation(fields: [playerId], references: [id])
+  playerId  String?
+  player    Player? @relation(fields: [playerId], references: [id])
 
-  slotLabel String // e.g., "GK1", "DEF1"
+  slotLabel String
+
   @@unique([teamId, slotLabel])
-  @@index([playerId])
 }
 
 model Fixture {
@@ -114,36 +118,30 @@ model Fixture {
   awayTeam  String
   kickoffAt DateTime
   gw        Int
+
   events    ScoreEvent[]
-  @@index([gw])
 }
 
 model ScoreEvent {
-  id        String  @id @default(cuid())
-
+  id        String   @id @default(cuid())
   fixtureId String
-  fixture   Fixture @relation(fields: [fixtureId], references: [id], onDelete: Cascade)
+  fixture   Fixture  @relation(fields: [fixtureId], references: [id])
 
   playerId  String
-  player    Player  @relation(fields: [playerId], references: [id])
+  player    Player   @relation(fields: [playerId], references: [id])
 
-  type      EventType
+  type      String   // "goal" | "assist" | "appearance"
   value     Int
-  createdAt DateTime @default(now())
-
-  @@index([fixtureId])
-  @@index([playerId])
 }
 
 model GameweekScore {
-  id     String @id @default(cuid())
+  id        String @id @default(cuid())
 
-  teamId String
-  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  teamId    String
+  team      Team   @relation(fields: [teamId], references: [id])
 
-  gw     Int
-  total  Int
+  gw        Int
+  total     Int
 
   @@unique([teamId, gw])
-  @@index([teamId])
 }
