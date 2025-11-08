@@ -7,6 +7,7 @@ import type { Player, SquadSlot } from "@/types/fantasy";
 export type ActionState = { ok: boolean; message: string };
 
 const BASE_BUDGET = 34; // keep in sync with page.tsx
+const MAX_FROM_CLUB = 3;
 
 // --- helpers (not exported) ---
 async function getTeamForCurrentUser() {
@@ -49,7 +50,9 @@ export async function addToSquadAction(
 
   // Club cap (example: 1 per club; tweak as needed)
   const fromSameClub = slots.filter((s: typeof slots[number]) => s.player?.teamName === player.teamName).length;
-  if (fromSameClub >= 1) return { ok: false, message: "Too many players from this team." };
+  if (fromSameClub >= MAX_FROM_CLUB) {
+    return { ok: false, message: `Too many players from this team (max ${MAX_FROM_CLUB}).` };
+  }
 
   // Slot availability must match position
   const prefix = slotPrefixForPosition(player.position as Player["position"]);

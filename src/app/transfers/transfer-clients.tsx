@@ -36,7 +36,9 @@ function canAddPlayer(
     const match = players.find((pp: Player) => pp.id === s.player!.id);
     return match?.teamName === p.teamName;
   }).length;
-  if (fromClub >= maxFromClub) return { ok: false, reason: "Team limit reached" };
+  if (fromClub >= maxFromClub) {
+    return { ok: false, reason: `Team limit reached (max ${maxFromClub})` };
+  }
 
   const prefix = p.position === "GK" ? "GK" : "OUT";
   const idx = localSquad.findIndex(
@@ -122,7 +124,7 @@ export default function TransfersClient({
   const isInSquad = (pid: string): boolean =>
     localSquad.some((s: SquadSlot): boolean => s.player?.id === pid);
 
-  const MAX_FROM_CLUB_LOCAL = 1;
+  const MAX_FROM_CLUB_LOCAL = 3;
 
   function showError(msg: string): void {
     setErrorMsg(msg);
