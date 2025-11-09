@@ -63,19 +63,21 @@ export async function saveLineupAction(formData: FormData): Promise<SaveLineupRe
     }
 
     submitted = parsed.map((entry) => {
-      if (
-        typeof entry !== "object" ||
-        entry === null ||
-        typeof (entry as Record<string, unknown>).slotLabel !== "string" ||
-        typeof (entry as Record<string, unknown>).playerId !== "string" ||
-        (entry as Record<string, unknown>).playerId.length === 0
-      ) {
+      if (typeof entry !== "object" || entry === null) {
+        throw new Error("Invalid slot entry.");
+      }
+
+      const record = entry as Record<string, unknown>;
+      const slotLabel = record.slotLabel;
+      const playerId = record.playerId;
+
+      if (typeof slotLabel !== "string" || typeof playerId !== "string" || playerId.length === 0) {
         throw new Error("Invalid slot entry.");
       }
 
       return {
-        slotLabel: (entry as Record<string, string>).slotLabel,
-        playerId: (entry as Record<string, string>).playerId,
+        slotLabel,
+        playerId,
       };
     });
   } catch (error) {
