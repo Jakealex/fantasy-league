@@ -4,11 +4,13 @@ import {
   useMemo,
   useState,
   useEffect,
+  useTransition,
   type ReactNode,
   type ReactElement,
 } from "react";
+import { useRouter } from "next/navigation";
 import type { Player, SquadSlot } from "@/types/fantasy";
-import { addToSquadDirect, removeFromSquadDirect } from "./actions";
+import { confirmTransfersDirect } from "./actions";
 
 // ---------- utils ----------
 function getErrorMessage(e: unknown): string {
@@ -49,6 +51,23 @@ function canAddPlayer(
   return { ok: true, slotIndex: idx };
 }
 
+function squadSignature(slots: SquadSlot[]): string {
+  return slots
+    .slice()
+    .sort((a, b) => a.slotLabel.localeCompare(b.slotLabel))
+    .map((slot) => `${slot.slotLabel}:${slot.player?.id ?? "-"}`)
+    .join("|");
+}
+
+function cloneSquad(slots: SquadSlot[]): SquadSlot[] {
+  return slots.map((slot) => ({
+    slotLabel: slot.slotLabel,
+    player: slot.player ? { ...slot.player } : undefined,
+  }));
+}
+
+const REQUIRED_SLOT_LABELS = ["GK1", "OUT1", "OUT2", "OUT3", "OUT4"] as const;
+
 export default function TransfersClient({
   squad,
   players,
@@ -58,6 +77,9 @@ export default function TransfersClient({
   players: Player[];
   initialBudget: number;
 }) {
+  const router = useRouter();
+  const [isSaving, startSaving] = useTransition();
+
   // ---------- Filters / sort ----------
   const [q, setQ] = useState<string>("");
   const [team, setTeam] = useState<string>("All");
@@ -66,27 +88,24 @@ export default function TransfersClient({
   const [sort, setSort] = useState<string>("%owned-desc");
 
   // ---------- Live budget + local squad ----------
-  const [localSquad, setLocalSquad] = useState<SquadSlot[]>(squad);
+  const [localSquad, setLocalSquad] = useState<SquadSlot[]>(() => cloneSquad(squad));
   const [localBudget, setLocalBudget] = useState<number>(initialBudget);
-  const [pendingId, setPendingId] = useState<string | null>(null);
-  const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
-  const [justAddedIds, setJustAddedIds] = useState<Set<string>>(new Set());
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
 
-  // Ensure expected slots exist (defensive)
+  // Ensure expected slots exist (defensive) and reset when server data changes
   useEffect(() => {
-    const requiredLabels = ["GK1", "OUT1", "OUT2", "OUT3", "OUT4"];
-    setLocalSquad((prev) => {
-      if (prev.length === 0) {
-        return requiredLabels.map((lbl) => ({ slotLabel: lbl }));
+    const next = cloneSquad(squad);
+    const labels = new Set(next.map((s) => s.slotLabel));
+    REQUIRED_SLOT_LABELS.forEach((lbl) => {
+      if (!labels.has(lbl)) {
+        next.push({ slotLabel: lbl });
       }
-      const labels = new Set(prev.map((s) => s.slotLabel));
-      const missing = requiredLabels
-        .filter((lbl) => !labels.has(lbl))
-        .map((lbl) => ({ slotLabel: lbl }));
-      return missing.length ? [...prev, ...missing] : prev;
     });
-  }, []);
+    setLocalSquad(next);
+    setLocalBudget(initialBudget);
+    setConfirmMessage(null);
+  }, [squad, initialBudget]);
 
   // ---------- Derived lists ----------
   const teams = useMemo<string[]>(
@@ -125,6 +144,19 @@ export default function TransfersClient({
     localSquad.some((s: SquadSlot): boolean => s.player?.id === pid);
 
   const MAX_FROM_CLUB_LOCAL = 3;
+  const initialSignature = useMemo<string>(() => squadSignature(squad), [squad]);
+  const currentSignature = useMemo<string>(() => squadSignature(localSquad), [localSquad]);
+  const hasUnsavedChanges = initialSignature !== currentSignature;
+
+  useEffect(() => {
+    console.log("transfer debug", {
+      initialSignature,
+      currentSignature,
+      hasUnsavedChanges,
+      squad,
+      localSquad,
+    });
+  }, [initialSignature, currentSignature, hasUnsavedChanges, squad, localSquad]);
 
   function showError(msg: string): void {
     setErrorMsg(msg);
@@ -132,7 +164,7 @@ export default function TransfersClient({
   }
 
   // ---------- Add ----------
-  async function handleAdd(p: Player): Promise<void> {
+  function handleAdd(p: Player): void {
     // Let UI be clickable; we still block with messages here.
     const verdict = canAddPlayer(
       p,
@@ -151,45 +183,17 @@ export default function TransfersClient({
       return;
     }
 
-    const prevSquad: SquadSlot[] = localSquad;
-    const prevBudget: number = localBudget;
-    const slotLabel: string = localSquad[slotIndex].slotLabel;
-
-    // optimistic UI
-    const next: SquadSlot[] = [...localSquad];
-    next[slotIndex] = { ...next[slotIndex], player: { id: p.id, name: p.name } };
-    setLocalSquad(next);
+    setLocalSquad((prev: SquadSlot[]): SquadSlot[] => {
+      const next = [...prev];
+      next[slotIndex] = { ...next[slotIndex], player: { id: p.id, name: p.name } };
+      return next;
+    });
     setLocalBudget((b: number): number => b - p.price);
-    setPendingId(p.id);
-
-    try {
-      const fd = new FormData();
-      fd.append("playerId", p.id);
-      fd.append("playerName", p.name);
-      fd.append("slotLabel", slotLabel);
-      fd.append("squad", JSON.stringify(prevSquad));
-
-      await addToSquadDirect(fd);
-
-      setJustAddedIds((curr: Set<string>): Set<string> => new Set([...curr, p.id]));
-      window.setTimeout((): void => {
-        setJustAddedIds((set0: Set<string>): Set<string> => {
-          const s = new Set(set0);
-          s.delete(p.id);
-          return s;
-        });
-      }, 1200);
-    } catch (e: unknown) {
-      setLocalSquad(prevSquad);
-      setLocalBudget(prevBudget);
-      showError(getErrorMessage(e) || "Could not add player.");
-    } finally {
-      setPendingId(null);
-    }
+    setConfirmMessage(null);
   }
 
   // ---------- Remove ----------
-  async function handleRemove(slot: SquadSlot): Promise<void> {
+  function handleRemove(slot: SquadSlot): void {
     if (!slot.player) return;
 
     const player: Player | undefined = players.find(
@@ -197,29 +201,43 @@ export default function TransfersClient({
     );
     const price: number = player?.price ?? 0;
 
-    const prevSquad: SquadSlot[] = localSquad;
-    const prevBudget: number = localBudget;
-
-    const next: SquadSlot[] = localSquad.map((s: SquadSlot): SquadSlot =>
-      s.slotLabel === slot.slotLabel ? { ...s, player: undefined } : s
+    setLocalSquad((prev: SquadSlot[]): SquadSlot[] =>
+      prev.map((s: SquadSlot): SquadSlot =>
+        s.slotLabel === slot.slotLabel ? { ...s, player: undefined } : s
+      )
     );
-    setLocalSquad(next);
     setLocalBudget((b: number): number => b + price);
-    setPendingRemoveId(slot.player.id);
+    setConfirmMessage(null);
+  }
 
-    try {
-      const fd = new FormData();
-      fd.append("slotLabel", slot.slotLabel);
-      fd.append("squad", JSON.stringify(prevSquad));
-
-      await removeFromSquadDirect(fd);
-    } catch (e: unknown) {
-      setLocalSquad(prevSquad);
-      setLocalBudget(prevBudget);
-      showError(getErrorMessage(e) || "Could not remove player.");
-    } finally {
-      setPendingRemoveId(null);
+  // ---------- Confirm ----------
+  function handleConfirm(): void {
+    if (!hasUnsavedChanges || isSaving) {
+      return;
     }
+    setConfirmMessage(null);
+    const slotsPayload = REQUIRED_SLOT_LABELS.map((label) => {
+      const slot = localSquad.find((s) => s.slotLabel === label);
+      return {
+        slotLabel: label,
+        playerId: slot?.player?.id ?? null,
+      };
+    });
+    const formData = new FormData();
+    formData.append("slots", JSON.stringify(slotsPayload));
+
+    startSaving(async () => {
+      try {
+        const result = await confirmTransfersDirect(formData);
+        if (!result.ok) {
+          setConfirmMessage(result.message || "Could not confirm transfers.");
+          return;
+        }
+        router.push("/pick-team");
+      } catch (error) {
+        setConfirmMessage(getErrorMessage(error));
+      }
+    });
   }
 
   return (
@@ -238,7 +256,6 @@ export default function TransfersClient({
                     | undefined
                 }
                 onRemove={handleRemove}
-                pendingRemoveId={pendingRemoveId}
               />
             </SlotRow>
 
@@ -249,7 +266,6 @@ export default function TransfersClient({
                     key={lbl}
                     slot={localSquad.find((s: SquadSlot): boolean => s.slotLabel === lbl)}
                     onRemove={handleRemove}
-                    pendingRemoveId={pendingRemoveId}
                   />
                 ))}
               </div>
@@ -361,18 +377,8 @@ export default function TransfersClient({
               MAX_FROM_CLUB_LOCAL
             );
 
-            // Only disable when busy or already in squad; still clickable to show reason
-            const disabled =
-              pendingId === p.id || isInSquad(p.id);
-
-            const label =
-              pendingId === p.id
-                ? "Adding..."
-                : justAddedIds.has(p.id)
-                ? "Added ✓"
-                : isInSquad(p.id)
-                ? "In Squad"
-                : "Add to Squad";
+            const disabled = isInSquad(p.id);
+            const label = isInSquad(p.id) ? "In Squad" : "Add to Squad";
 
             return (
               <li key={p.id} className="rounded-lg border p-3">
@@ -409,7 +415,7 @@ export default function TransfersClient({
 
                 <div className="mt-2">
                   <button
-                    onClick={(): Promise<void> => handleAdd(p)}
+                    onClick={(): void => handleAdd(p)}
                     disabled={disabled}
                     className={
                       "rounded border px-3 py-1 text-sm " +
@@ -430,6 +436,33 @@ export default function TransfersClient({
             );
           })}
         </ul>
+
+        <div className="mt-6 rounded-xl border p-4">
+          {confirmMessage && (
+            <div className="mb-3 rounded border border-red-400 bg-red-50 text-red-800 px-3 py-2 text-sm">
+              {confirmMessage}
+            </div>
+          )}
+
+          <button
+            onClick={handleConfirm}
+            disabled={!hasUnsavedChanges || isSaving}
+            className={
+              "w-full rounded bg-black text-white px-3 py-2 text-sm font-medium " +
+              (!hasUnsavedChanges || isSaving
+                ? "opacity-60 cursor-not-allowed"
+                : "hover:bg-gray-900 transition-colors")
+            }
+          >
+            {isSaving ? "Saving..." : "Confirm Transfers"}
+          </button>
+
+          {!hasUnsavedChanges && (
+            <p className="mt-2 text-xs text-gray-600">
+              Make a change to enable confirmation.
+            </p>
+          )}
+        </div>
       </section>
     </div>
   );
@@ -454,14 +487,11 @@ function SlotRow({
 function SlotCard({
   slot,
   onRemove,
-  pendingRemoveId,
 }: {
   slot?: SquadSlot;
   onRemove?: (slot: SquadSlot) => void;
-  pendingRemoveId?: string | null;
 }): ReactElement {
   const empty: boolean = !slot?.player;
-  const removing: boolean = !!slot?.player && pendingRemoveId === slot.player.id;
 
   return (
     <div
@@ -482,14 +512,12 @@ function SlotCard({
         {!empty && onRemove && slot ? (
           <button
             onClick={(): void => onRemove(slot)}
-            disabled={removing}
             className={
-              "text-[11px] border rounded px-2 py-1 " +
-              (removing ? "opacity-60 cursor-wait" : "hover:bg-gray-50")
+              "text-[11px] border rounded px-2 py-1 hover:bg-gray-50"
             }
             title="Remove from squad"
           >
-            {removing ? "Removing..." : "Remove"}
+            Remove
           </button>
         ) : null}
         <div className="text-[11px] text-gray-600">{slot?.slotLabel}</div>
