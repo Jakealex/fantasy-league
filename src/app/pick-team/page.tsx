@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import type { Position } from "@/types/fantasy";
 import PickTeamClient from "./PickTeamClient";
@@ -175,6 +177,14 @@ export default async function Page() {
         }
       : undefined,
   }));
+
+  console.log(
+    "[pick-team] fetched slots",
+    squad.map((slot) => ({
+      slotLabel: slot.slotLabel,
+      playerId: slot.player?.id ?? null,
+    }))
+  );
 
   return (
     <main className="p-6 space-y-6">

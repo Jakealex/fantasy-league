@@ -1,6 +1,8 @@
 // src/app/transfers/actions.ts
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { Player } from "@/types/fantasy";
 
@@ -218,7 +220,7 @@ export async function confirmTransfersAction(
   const team = await getTeamForCurrentUser();
 
   try {
-    await prisma.$transaction([
+    const transactionResults = await prisma.$transaction([
       ...REQUIRED_SLOT_LABELS.map((slotLabel) => {
         const slot = submitted.find((s) => s.slotLabel === slotLabel);
         const playerId = slot?.playerId ?? null;
@@ -233,6 +235,18 @@ export async function confirmTransfersAction(
         data: { budget: BASE_BUDGET - totalSpent },
       }),
     ]);
+
+    console.log(
+      "[confirmTransfers] updated slots",
+      REQUIRED_SLOT_LABELS.length,
+      "teamId",
+      team.id
+    );
+
+    revalidatePath("/transfers");
+    revalidatePath("/pick-team");
+
+    redirect("/pick-team");
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not confirm transfers.";
@@ -249,5 +263,6 @@ export async function addToSquadDirect(formData: FormData): Promise<ActionState>
 export async function removeFromSquadDirect(formData: FormData): Promise<ActionState> {
   return removeFromSquadAction({ ok: false, message: "" }, formData);
 }
-export const confirmTransfersDirect = async (formData: FormData): Promise<ConfirmActionState> =>
-  confirmTransfersAction({ ok: false, message: "" }, formData);
+export const confirmTransfersDirect = async (
+  formData: FormData
+): Promise<ConfirmActionState> => confirmTransfersAction({ ok: false, message: "" }, formData);

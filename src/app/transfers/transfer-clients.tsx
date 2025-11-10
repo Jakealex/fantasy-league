@@ -8,7 +8,6 @@ import {
   type ReactNode,
   type ReactElement,
 } from "react";
-import { useRouter } from "next/navigation";
 import type { Player, SquadSlot } from "@/types/fantasy";
 import { confirmTransfersDirect } from "./actions";
 
@@ -77,7 +76,6 @@ export default function TransfersClient({
   players: Player[];
   initialBudget: number;
 }) {
-  const router = useRouter();
   const [isSaving, startSaving] = useTransition();
 
   // ---------- Filters / sort ----------
@@ -231,11 +229,11 @@ export default function TransfersClient({
         const result = await confirmTransfersDirect(formData);
         if (!result.ok) {
           setConfirmMessage(result.message || "Could not confirm transfers.");
-          return;
         }
-        router.push("/pick-team");
       } catch (error) {
-        setConfirmMessage(getErrorMessage(error));
+        if (!isRedirectError(error)) {
+          setConfirmMessage(getErrorMessage(error));
+        }
       }
     });
   }
@@ -466,6 +464,10 @@ export default function TransfersClient({
       </section>
     </div>
   );
+}
+
+function isRedirectError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "digest" in error;
 }
 
 /* --- small UI helpers --- */
