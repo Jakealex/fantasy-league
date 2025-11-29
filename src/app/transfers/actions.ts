@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getCurrentGameweek } from "@/lib/gameweek";
 import type { Player } from "@/types/fantasy";
 
 export type ActionState = { ok: boolean; message: string };
@@ -215,6 +216,16 @@ export async function confirmTransfersAction(
 
   if (totalSpent > BASE_BUDGET) {
     return { ok: false, message: "Budget exceeded." };
+  }
+
+  // Check gameweek status
+  const currentGameweek = await getCurrentGameweek();
+  if (!currentGameweek || currentGameweek.isFinished) {
+    return { ok: false, message: "Gameweek is finished. Transfers are locked." };
+  }
+
+  if (currentGameweek.deadlineAt < new Date()) {
+    return { ok: false, message: "Deadline has passed. Transfers are locked." };
   }
 
   // Check if transfers are open

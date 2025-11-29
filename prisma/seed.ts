@@ -102,7 +102,21 @@ async function main() {
     create: { teamId: team.id, playerId: out.id, slotLabel: 'OUT1' }
   });
 
-  // 7) Sample fixture / event / score
+  // 7) Gameweek
+  const gw1 = await prisma.gameweek.upsert({
+    where: { number: 1 },
+    update: {},
+    create: {
+      number: 1,
+      name: 'Gameweek 1',
+      startsAt: new Date('2025-01-01T00:00:00Z'),
+      deadlineAt: new Date('2025-01-03T16:00:00Z'),
+      isCurrent: true,
+      isFinished: false,
+    },
+  });
+
+  // 8) Sample fixture / event / score
   const fixture = await prisma.fixture.upsert({
     where: { id: 'demo-fixture-1' },
     update: {},
@@ -111,8 +125,8 @@ async function main() {
       homeTeam: squadTeamName,
       awayTeam: 'Rivals FC',
       kickoffAt: new Date(Date.now() + 24 * 3600 * 1000),
-      gw: 1
-    }
+      gameweekId: gw1.id,
+    },
   });
 
   await prisma.scoreEvent.upsert({
@@ -123,17 +137,17 @@ async function main() {
       fixtureId: fixture.id,
       playerId: out.id,
       type: 'goal' as EventType,
-      value: 5
-    }
+      value: 5,
+    },
   });
 
   await prisma.gameweekScore.upsert({
-    where: { teamId_gw: { teamId: team.id, gw: 1 } },
+    where: { teamId_gameweekId: { teamId: team.id, gameweekId: gw1.id } },
     update: { total: 5 },
-    create: { teamId: team.id, gw: 1, total: 5 }
+    create: { teamId: team.id, gameweekId: gw1.id, total: 5 },
   });
 
-  // 8) GlobalSettings
+  // 9) GlobalSettings
   await prisma.globalSettings.upsert({
     where: { id: 1 },
     update: {},

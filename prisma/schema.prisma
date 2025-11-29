@@ -9,7 +9,9 @@ datasource db {
   // optional: shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
-/* ---------- ENUMS ---------- */
+/**
+ * ---------- ENUMS ----------
+ */
 enum Position {
   GK
   OUT
@@ -20,69 +22,70 @@ enum PlayerStatus {
   I
 }
 
-/* ---------- MODELS ---------- */
+/**
+ * ---------- MODELS ----------
+ */
 
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  passwordHash  String
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String
 
-  teams         Team[]
-  leaguesOwned  League[]       @relation("LeagueOwner")
-  memberships   LeagueMember[]
+  teams        Team[]
+  leaguesOwned League[]       @relation("LeagueOwner")
+  memberships  LeagueMember[]
 }
 
 model League {
-  id         String        @id @default(cuid())
+  id         String @id @default(cuid())
   name       String
-  inviteCode String        @unique
+  inviteCode String @unique
 
-  ownerId    String
-  owner      User          @relation("LeagueOwner", fields: [ownerId], references: [id])
+  ownerId String
+  owner   User   @relation("LeagueOwner", fields: [ownerId], references: [id])
 
-  teams      Team[]
-  members    LeagueMember[]
+  teams   Team[]
+  members LeagueMember[]
 }
 
 model LeagueMember {
-  id       String  @id @default(cuid())
+  id String @id @default(cuid())
 
   userId   String
   leagueId String
   role     String
 
-  user     User    @relation(fields: [userId], references: [id])
-  league   League  @relation(fields: [leagueId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  league League @relation(fields: [leagueId], references: [id])
 
   @@unique([leagueId, userId])
 }
 
 model Team {
-  id        String     @id @default(cuid())
-  name      String
+  id   String @id @default(cuid())
+  name String
 
-  userId    String
-  user      User       @relation(fields: [userId], references: [id])
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
 
-  leagueId  String
-  league    League     @relation(fields: [leagueId], references: [id])
+  leagueId String
+  league   League @relation(fields: [leagueId], references: [id])
 
-  budget    Float      @default(34)
+  budget Float @default(34)
 
-  slots           SquadSlot[]
-  gameweekScores  GameweekScore[]
+  slots          SquadSlot[]
+  gameweekScores GameweekScore[]
 
   @@unique([userId, leagueId]) // ✅ add this line
 }
 
-
 model Player {
-  id          String        @id @default(cuid())
-  name        String
-  teamName    String
-  position    Position
-  price       Float
-  status      PlayerStatus
+  id       String       @id @default(cuid())
+  name     String
+  teamName String
+  position Position
+  price    Float
+  status   PlayerStatus
 
   ownedPct    Float?
   nextFixture String?
@@ -92,24 +95,37 @@ model Player {
   assists     Int?
   cleanSheets Int?
 
-  slots       SquadSlot[]
-  events      ScoreEvent[]
+  slots  SquadSlot[]
+  events ScoreEvent[]
 
   @@unique([name, teamName])
 }
 
 model SquadSlot {
-  id        String  @id @default(cuid())
+  id String @id @default(cuid())
 
-  teamId    String
-  team      Team    @relation(fields: [teamId], references: [id])
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id])
 
-  playerId  String?
-  player    Player? @relation(fields: [playerId], references: [id])
+  playerId String?
+  player   Player? @relation(fields: [playerId], references: [id])
 
   slotLabel String
 
   @@unique([teamId, slotLabel])
+}
+
+model Gameweek {
+  id         Int      @id @default(autoincrement())
+  number     Int      @unique // 1, 2, 3, ...
+  name       String? // e.g. "Gameweek 1"
+  startsAt   DateTime
+  deadlineAt DateTime
+  isCurrent  Boolean  @default(false)
+  isFinished Boolean  @default(false)
+
+  fixtures Fixture[]
+  scores   GameweekScore[]
 }
 
 model Fixture {
@@ -117,36 +133,40 @@ model Fixture {
   homeTeam  String
   awayTeam  String
   kickoffAt DateTime
-  gw        Int
 
-  events    ScoreEvent[]
+  gameweekId Int
+  gameweek   Gameweek @relation(fields: [gameweekId], references: [id])
+
+  events ScoreEvent[]
 }
 
 model ScoreEvent {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   fixtureId String
-  fixture   Fixture  @relation(fields: [fixtureId], references: [id])
+  fixture   Fixture @relation(fields: [fixtureId], references: [id])
 
-  playerId  String
-  player    Player   @relation(fields: [playerId], references: [id])
+  playerId String
+  player   Player @relation(fields: [playerId], references: [id])
 
-  type      String   // "goal" | "assist" | "appearance"
-  value     Int
+  type  String // "goal" | "assist" | "appearance"
+  value Int
 }
 
 model GameweekScore {
-  id        String @id @default(cuid())
+  id String @id @default(cuid())
 
-  teamId    String
-  team      Team   @relation(fields: [teamId], references: [id])
+  teamId String
+  team   Team   @relation(fields: [teamId], references: [id])
 
-  gw        Int
-  total     Int
+  gameweekId Int
+  gameweek   Gameweek @relation(fields: [gameweekId], references: [id])
 
-  @@unique([teamId, gw])
+  total Int // total points for this team in this gameweek
+
+  @@unique([teamId, gameweekId]) // one score per team per gameweek
 }
 
 model GlobalSettings {
-  id           Int     @id @default(1)
+  id            Int     @id @default(1)
   transfersOpen Boolean @default(true)
 }

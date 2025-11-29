@@ -1,5 +1,6 @@
 // src/app/transfers/page.tsx
 import { prisma } from "@/lib/prisma";
+import { getCurrentGameweek } from "@/lib/gameweek";
 import TransfersClient from "./transfer-clients";
 import type { Player as UiPlayer, SquadSlot as UiSquadSlot } from "@/types/fantasy";
 
@@ -97,12 +98,26 @@ if (!team) {
   });
   const transfersOpen = globalSettings?.transfersOpen ?? true;
 
+  // Fetch current gameweek
+  const currentGameweek = await getCurrentGameweek();
+  if (!currentGameweek) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="rounded-xl border border-red-400 bg-red-50 text-red-800 p-4">
+          <h1 className="text-xl font-bold mb-2">No Active Gameweek</h1>
+          <p>There is no current gameweek configured. Please contact an administrator.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <TransfersClient
       squad={squad}
       players={players}
       initialBudget={initialBudget}
       transfersOpen={transfersOpen}
+      currentGameweek={currentGameweek}
     />
   );
 }

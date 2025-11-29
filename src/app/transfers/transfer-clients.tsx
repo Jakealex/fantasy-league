@@ -67,18 +67,35 @@ function cloneSquad(slots: SquadSlot[]): SquadSlot[] {
 
 const REQUIRED_SLOT_LABELS = ["GK1", "OUT1", "OUT2", "OUT3", "OUT4"] as const;
 
+type CurrentGameweek = {
+  id: number;
+  number: number;
+  name: string | null;
+  startsAt: Date;
+  deadlineAt: Date;
+  isCurrent: boolean;
+  isFinished: boolean;
+};
+
 export default function TransfersClient({
   squad,
   players,
   initialBudget,
   transfersOpen,
+  currentGameweek,
 }: {
   squad: SquadSlot[];
   players: Player[];
   initialBudget: number;
   transfersOpen: boolean;
+  currentGameweek: CurrentGameweek;
 }) {
   const [isSaving, startSaving] = useTransition();
+
+  // Check if deadline has passed
+  const now = new Date();
+  const deadlinePassed = now > currentGameweek.deadlineAt;
+  const transfersLocked = !transfersOpen || deadlinePassed || currentGameweek.isFinished;
 
   // ---------- Filters / sort ----------
   const [q, setQ] = useState<string>("");
@@ -212,7 +229,7 @@ export default function TransfersClient({
 
   // ---------- Confirm ----------
   function handleConfirm(): void {
-    if (!hasUnsavedChanges || isSaving || !transfersOpen) {
+    if (!hasUnsavedChanges || isSaving || transfersLocked) {
       return;
     }
     setConfirmMessage(null);
@@ -240,12 +257,34 @@ export default function TransfersClient({
     });
   }
 
+  // Format deadline date
+  const formatDeadline = (date: Date): string => {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(date);
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Left: Squad */}
       <section className="lg:col-span-1">
         <div className="rounded-xl border p-4">
           <h2 className="font-semibold mb-3">Your Squad (1 GK + 4 OUT)</h2>
+          
+          {/* Gameweek Info */}
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+            <div className="text-sm font-semibold text-gray-900 mb-1">
+              Transfers for {currentGameweek.name || `Gameweek ${currentGameweek.number}`}
+            </div>
+            <div className="text-xs text-gray-600">
+              Deadline: {formatDeadline(currentGameweek.deadlineAt)}
+            </div>
+          </div>
 
           <div className="space-y-3">
             <SlotRow label="Goalkeeper">
@@ -255,7 +294,7 @@ export default function TransfersClient({
                     | SquadSlot
                     | undefined
                 }
-                onRemove={handleRemove}
+                onRemove={transfersLocked ? undefined : handleRemove}
               />
             </SlotRow>
 
@@ -265,7 +304,7 @@ export default function TransfersClient({
                   <SlotCard
                     key={lbl}
                     slot={localSquad.find((s: SquadSlot): boolean => s.slotLabel === lbl)}
-                    onRemove={handleRemove}
+                    onRemove={transfersLocked ? undefined : handleRemove}
                   />
                 ))}
               </div>
@@ -276,11 +315,19 @@ export default function TransfersClient({
 
       {/* Right: Filters + Budget + List */}
       <section className="lg:col-span-2">
-        {!transfersOpen && (
+        {transfersLocked && (
           <div className="rounded-xl border border-red-400 bg-red-50 text-red-800 p-4 mb-4">
-            <p className="font-semibold">⚠️ Transfers are currently closed.</p>
+            <p className="font-semibold">
+              ⚠️ {deadlinePassed 
+                ? `Transfers are closed for ${currentGameweek.name || `Gameweek ${currentGameweek.number}`}.`
+                : currentGameweek.isFinished
+                ? "Gameweek is finished. Transfers are locked."
+                : "Transfers are currently closed."}
+            </p>
             <p className="text-sm mt-1">
-              You cannot make transfers at this time. Please check back later.
+              {deadlinePassed
+                ? `The deadline (${formatDeadline(currentGameweek.deadlineAt)}) has passed.`
+                : "You cannot make transfers at this time. Please check back later."}
             </p>
           </div>
         )}
@@ -424,14 +471,18 @@ export default function TransfersClient({
                 <div className="mt-2">
                   <button
                     onClick={(): void => handleAdd(p)}
-                    disabled={disabled || !transfersOpen}
+                    disabled={disabled || transfersLocked}
                     className={
                       "rounded border px-3 py-1 text-sm " +
-                      (disabled || !transfersOpen ? "opacity-60 cursor-not-allowed" : "hover:bg-gray-50")
+                      (disabled || transfersLocked ? "opacity-60 cursor-not-allowed" : "hover:bg-gray-50")
                     }
                     title={
-                      !transfersOpen
-                        ? "Transfers are closed"
+                      transfersLocked
+                        ? deadlinePassed
+                          ? "Deadline has passed"
+                          : currentGameweek.isFinished
+                          ? "Gameweek is finished"
+                          : "Transfers are closed"
                         : !verdict.ok && verdict.reason
                         ? verdict.reason
                         : undefined
@@ -460,10 +511,10 @@ export default function TransfersClient({
 
           <button
             onClick={handleConfirm}
-            disabled={!hasUnsavedChanges || isSaving || !transfersOpen}
+            disabled={!hasUnsavedChanges || isSaving || transfersLocked}
             className={
               "w-full rounded bg-black text-white px-3 py-2 text-sm font-medium " +
-              (!hasUnsavedChanges || isSaving || !transfersOpen
+              (!hasUnsavedChanges || isSaving || transfersLocked
                 ? "opacity-60 cursor-not-allowed"
                 : "hover:bg-gray-900 transition-colors")
             }
