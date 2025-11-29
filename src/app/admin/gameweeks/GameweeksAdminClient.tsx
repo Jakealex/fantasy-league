@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Switch } from "@/app/_components/Switch";
 
 type Gameweek = {
@@ -422,6 +423,14 @@ export default function GameweeksAdminClient({
                         </button>
                       </>
                     )}
+                  </div>
+                  <div>
+                    <Link
+                      href={`/admin/gameweeks/${gw.id}/points`}
+                      className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                    >
+                      Edit Points
+                    </Link>
                   </div>
                 </div>
               </div>

@@ -95,8 +95,9 @@ model Player {
   assists     Int?
   cleanSheets Int?
 
-  slots  SquadSlot[]
-  events ScoreEvent[]
+  slots       SquadSlot[]
+  events      ScoreEvent[]
+  playerPoints PlayerPoints[]
 
   @@unique([name, teamName])
 }
@@ -111,6 +112,8 @@ model SquadSlot {
   player   Player? @relation(fields: [playerId], references: [id])
 
   slotLabel String
+  isCaptain Boolean @default(false)
+  isVice    Boolean @default(false) // For future use
 
   @@unique([teamId, slotLabel])
 }
@@ -124,8 +127,9 @@ model Gameweek {
   isCurrent  Boolean  @default(false)
   isFinished Boolean  @default(false)
 
-  fixtures Fixture[]
-  scores   GameweekScore[]
+  fixtures     Fixture[]
+  scores       GameweekScore[]
+  playerPoints PlayerPoints[]
 }
 
 model Fixture {
@@ -164,6 +168,26 @@ model GameweekScore {
   total Int // total points for this team in this gameweek
 
   @@unique([teamId, gameweekId]) // one score per team per gameweek
+}
+
+model PlayerPoints {
+  id         Int      @id @default(autoincrement())
+  playerId   String
+  gameweekId Int
+  points     Int      @default(0)
+
+  // Stats for scoring calculation
+  goals         Int @default(0)
+  assists       Int @default(0)
+  ownGoals      Int @default(0)
+  yellowCards   Int @default(0)
+  redCards      Int @default(0)
+  goalsConceded Int @default(0) // For GK: goals conceded by their team
+
+  player   Player   @relation(fields: [playerId], references: [id])
+  gameweek Gameweek @relation(fields: [gameweekId], references: [id])
+
+  @@unique([playerId, gameweekId])
 }
 
 model GlobalSettings {

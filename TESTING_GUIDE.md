@@ -1,296 +1,184 @@
-# Testing Guide: Gameweek Integration with Transfers
+# Testing Guide: Scoring Engine
 
-## Quick Verification Checklist
+## Prerequisites
+1. Database is seeded (run `npx prisma migrate reset` if needed)
+2. Dev server is running (`npm run dev`)
+3. You have admin access (first user in database is admin by default)
 
-### ✅ 1. Visual Checks on `/transfers` Page
+## Step-by-Step Testing
 
-**What to look for:**
-- [ ] Page displays: "Transfers for Gameweek 1" (or current gameweek number)
-- [ ] Deadline is shown: "Deadline: Jan 3, 2025, 4:00 PM" (formatted date)
-- [ ] If deadline passed: Red banner "Transfers are closed for this gameweek."
-- [ ] If deadline not passed: No red banner, transfers should be enabled
-
----
-
-### ✅ 2. Test Transfer Functionality
-
-#### Test Case A: Transfers Open (Before Deadline)
-1. **Setup:**
-   - Ensure current gameweek has `deadlineAt` in the future
-   - Ensure `GlobalSettings.transfersOpen = true`
-   - Ensure `isFinished = false`
-
-2. **Expected Behavior:**
-   - ✅ Can click "Add to Squad" buttons
-   - ✅ Can click "Remove" buttons
-   - ✅ "Confirm Transfers" button is enabled
-   - ✅ No red warning banners
-   - ✅ Transfers submit successfully
-
-#### Test Case B: Deadline Passed (Client-Side)
-1. **Setup:**
-   - Update gameweek `deadlineAt` to a past date:
-   ```sql
-   UPDATE "Gameweek" SET "deadlineAt" = '2024-01-01T00:00:00Z' WHERE "number" = 1;
-   ```
-
-2. **Expected Behavior:**
-   - ✅ Red banner: "Transfers are closed for this gameweek."
-   - ✅ All "Add to Squad" buttons are disabled
-   - ✅ "Remove" buttons are disabled
-   - ✅ "Confirm Transfers" button is disabled
-   - ✅ Tooltips show "Transfers are closed"
-
-#### Test Case C: Deadline Passed (Server-Side)
-1. **Setup:** Same as Test Case B
-
-2. **Test:**
-   - Try to submit a transfer via API/action (even if client is disabled)
-   - Use browser dev tools to manually call the action
-
-3. **Expected Behavior:**
-   - ✅ Server returns: `{ ok: false, message: "Deadline has passed. Transfers are locked." }`
-   - ✅ Transfer is NOT saved to database
-
-#### Test Case D: Gameweek Finished
-1. **Setup:**
-   ```sql
-   UPDATE "Gameweek" SET "isFinished" = true WHERE "number" = 1;
-   ```
-
-2. **Expected Behavior:**
-   - ✅ Server returns: `{ ok: false, message: "Gameweek is finished. Transfers are locked." }`
-   - ✅ Transfer is NOT saved
-
-#### Test Case E: No Current Gameweek
-1. **Setup:**
-   ```sql
-   UPDATE "Gameweek" SET "isCurrent" = false WHERE "number" = 1;
-   ```
-
-2. **Expected Behavior:**
-   - ✅ Page shows error: "No Active Gameweek"
-   - ✅ Message: "There is no current gameweek configured. Please contact an administrator."
-
-#### Test Case F: Global Settings + Deadline (Both Must Pass)
-1. **Setup:**
-   - Set `GlobalSettings.transfersOpen = false`
-   - Keep deadline in future
-
-2. **Expected Behavior:**
-   - ✅ Transfers blocked (even if deadline hasn't passed)
-   - ✅ Shows: "Transfers are currently closed."
-
----
-
-## Step-by-Step Testing Instructions
-
-### Step 1: Start Your Dev Server
-
+### 1. Start the Dev Server
 ```bash
 npm run dev
 ```
 
-### Step 2: Check Current Gameweek Status
+### 2. Access Admin Gameweeks Page
+Navigate to: `http://localhost:3000/admin/gameweeks`
 
-Open your database or use Prisma Studio:
+You should see:
+- List of gameweeks (or create one if none exist)
+- Each gameweek should have a link to "Enter Points"
 
+### 3. Create/Select a Gameweek
+- If no gameweek exists, click "Create Gameweek"
+- Fill in:
+  - Number: 1
+  - Name: "Gameweek 1" (optional)
+  - Start Date: Any future date
+  - Deadline: Any future date
+  - Mark as Current: Yes
+- Click "Create Gameweek"
+
+### 4. Enter Player Stats
+- Click "Enter Points" for your gameweek
+- You should see a table with all players and columns:
+  - Player, Team, Position
+  - Goals, Assists, Own Goals, Yellow Cards, Red Cards, Goals Conceded
+  - Points
+
+**Test Data Example:**
+For a goalkeeper (e.g., "John Keeper"):
+- Goals: 0
+- Assists: 0
+- Own Goals: 0
+- Yellow Cards: 0
+- Red Cards: 0
+- Goals Conceded: 2
+- Points: 0 (will be calculated)
+
+For an outfield player (e.g., "Josh Berson"):
+- Goals: 2
+- Assists: 1
+- Own Goals: 0
+- Yellow Cards: 1
+- Red Cards: 0
+- Goals Conceded: 2 (team conceded 2 goals)
+- Points: 0
+
+### 5. Set a Captain
+You need to set a captain for at least one team. You can do this via:
+- Database directly, OR
+- Update the pick-team page to allow captain selection
+
+**Quick DB Test:**
+```sql
+-- Find a team and slot
+UPDATE "SquadSlot" 
+SET "isCaptain" = true 
+WHERE "slotLabel" = 'OUT1' 
+AND "teamId" = (SELECT id FROM "Team" LIMIT 1);
+```
+
+Or use Prisma Studio:
 ```bash
 npx prisma studio
 ```
+- Navigate to SquadSlot table
+- Find a slot with a player
+- Set `isCaptain` to `true`
 
-Navigate to `Gameweek` table and verify:
-- There's a gameweek with `isCurrent = true`
-- Note the `deadlineAt` value
-- Note the `isFinished` value
+### 6. Save Stats
+- Click "Save All" button
+- You should see: "Stats saved successfully!"
 
-### Step 3: Test Normal Flow (Before Deadline)
+### 7. Run Scoring
+- Click the "Run Scoring" button (blue button above the table)
+- Wait for the message: "Scoring completed successfully!"
 
-1. Navigate to: `http://localhost:3000/transfers`
-2. **Verify UI shows:**
-   - Gameweek number (e.g., "Transfers for Gameweek 1")
-   - Deadline date/time
-   - No red warning banners
-3. **Try to make a transfer:**
-   - Add a player to squad
-   - Click "Confirm Transfers"
-   - Should succeed and redirect to `/pick-team`
+### 8. Verify Scores Were Calculated
 
-### Step 4: Test Deadline Lock (Client-Side)
-
-1. **Update deadline to past:**
-   ```sql
-   -- In Prisma Studio or SQL client
-   UPDATE "Gameweek" 
-   SET "deadlineAt" = '2024-01-01T00:00:00Z' 
-   WHERE "isCurrent" = true;
-   ```
-
-2. **Refresh `/transfers` page**
-3. **Verify:**
-   - Red banner appears
-   - All buttons disabled
-   - Cannot interact with transfers
-
-### Step 5: Test Deadline Lock (Server-Side)
-
-1. **Keep deadline in past** (from Step 4)
-2. **Open browser DevTools** (F12)
-3. **Try to bypass client-side lock:**
-   - In Console, manually call the transfer action
-   - Or use Network tab to intercept and modify request
-4. **Verify:**
-   - Server still rejects the transfer
-   - Error message: "Deadline has passed. Transfers are locked."
-
-### Step 6: Test Gameweek Finished Lock
-
-1. **Update gameweek:**
-   ```sql
-   UPDATE "Gameweek" 
-   SET "isFinished" = true 
-   WHERE "isCurrent" = true;
-   ```
-
-2. **Try to submit transfer**
-3. **Verify:**
-   - Server returns: "Gameweek is finished. Transfers are locked."
-
-### Step 7: Test No Current Gameweek
-
-1. **Remove current gameweek:**
-   ```sql
-   UPDATE "Gameweek" 
-   SET "isCurrent" = false 
-   WHERE "isCurrent" = true;
-   ```
-
-2. **Refresh `/transfers` page**
-3. **Verify:**
-   - Error page shown
-   - Message: "No Active Gameweek"
-
-### Step 8: Reset for Normal Operation
-
-```sql
--- Reset gameweek to normal state
-UPDATE "Gameweek" 
-SET 
-  "isCurrent" = true,
-  "isFinished" = false,
-  "deadlineAt" = '2025-12-31T23:59:59Z'
-WHERE "number" = 1;
-```
-
----
-
-## Automated Testing (Optional)
-
-### Test Script
-
-Create `test-gameweek.ts`:
-
-```typescript
-import { prisma } from "./src/lib/prisma";
-import { getCurrentGameweek } from "./src/lib/gameweek";
-
-async function test() {
-  const gw = await getCurrentGameweek();
-  console.log("Current gameweek:", gw);
-  
-  if (!gw) {
-    console.error("❌ No current gameweek found");
-    return;
-  }
-  
-  const now = new Date();
-  const deadlinePassed = now > gw.deadlineAt;
-  
-  console.log("Deadline:", gw.deadlineAt);
-  console.log("Now:", now);
-  console.log("Deadline passed:", deadlinePassed);
-  console.log("Is finished:", gw.isFinished);
-  
-  if (deadlinePassed) {
-    console.log("⚠️  Deadline has passed - transfers should be locked");
-  } else {
-    console.log("✅ Deadline not passed - transfers should be open");
-  }
-}
-
-test();
-```
-
-Run with:
+**Option A: Check Database**
 ```bash
-npx ts-node test-gameweek.ts
-```
-
----
-
-## Common Issues & Solutions
-
-### Issue: "No Active Gameweek" error
-**Solution:** Ensure at least one gameweek has `isCurrent = true`:
-```sql
-UPDATE "Gameweek" SET "isCurrent" = true WHERE "number" = 1;
-```
-
-### Issue: Transfers still work after deadline
-**Check:**
-1. Is `deadlineAt` actually in the past? (check timezone)
-2. Did you refresh the page after updating deadline?
-3. Is server-side check working? (check browser Network tab)
-
-### Issue: TypeScript errors
-**Solution:** Regenerate Prisma client:
-```bash
-npx prisma generate
-```
-
-### Issue: Buttons not disabling
-**Check:**
-1. Is `currentGameweek` prop being passed correctly?
-2. Check browser console for errors
-3. Verify date comparison logic in client component
-
----
-
-## Verification Checklist Summary
-
-- [ ] Page loads without errors
-- [ ] Gameweek number displays correctly
-- [ ] Deadline displays correctly (formatted)
-- [ ] Before deadline: transfers work
-- [ ] After deadline: client-side lock works
-- [ ] After deadline: server-side lock works
-- [ ] Finished gameweek: server rejects transfers
-- [ ] No current gameweek: error page shows
-- [ ] Global settings + deadline: both checks work
-- [ ] TypeScript compiles without errors
-- [ ] No console errors in browser
-
----
-
-## Quick Test Commands
-
-```bash
-# Check current gameweek in database
 npx prisma studio
-# Navigate to Gameweek table
+```
+- Navigate to `GameweekScore` table
+- You should see rows with calculated `total` values
 
-# Or use SQL directly
-# Connect to your database and run:
-SELECT * FROM "Gameweek" WHERE "isCurrent" = true;
-
-# Update deadline to past (for testing)
-UPDATE "Gameweek" 
-SET "deadlineAt" = NOW() - INTERVAL '1 day'
-WHERE "isCurrent" = true;
-
-# Reset to future (for normal use)
-UPDATE "Gameweek" 
-SET "deadlineAt" = NOW() + INTERVAL '7 days'
-WHERE "isCurrent" = true;
+**Option B: Query via Terminal**
+```bash
+npx prisma db execute --stdin
+```
+Then paste:
+```sql
+SELECT 
+  t.name as team_name,
+  gs.total as score,
+  g.number as gameweek
+FROM "GameweekScore" gs
+JOIN "Team" t ON t.id = gs."teamId"
+JOIN "Gameweek" g ON g.id = gs."gameweekId"
+ORDER BY gs.total DESC;
 ```
 
+### 9. Manual Calculation Verification
+
+**Example Calculation (Goalkeeper with 2 goals conceded, NOT captain):**
+- Goals: 0 × 5 = 0
+- Assists: 0 × 3 = 0
+- Own Goals: 0 × -2 = 0
+- Yellow Cards: 0 × -1 = 0
+- Red Cards: 0 (no red card)
+- Goalkeeper bonus: 7 - 2 = 5
+- **Total: 5 points**
+
+**Example Calculation (Outfield with 2 goals, 1 assist, 1 yellow, 2 conceded, NOT captain):**
+- Goals: 2 × 5 = 10
+- Assists: 1 × 3 = 3
+- Own Goals: 0 × -2 = 0
+- Yellow Cards: 1 × -1 = -1
+- Red Cards: 0
+- Outfield bonus: +1 (goalsConceded ≤ 3)
+- **Total: 13 points**
+
+**Example Calculation (Same player, but IS captain):**
+- Base total: 13
+- Captain multiplier: 13 × 2 = **26 points**
+
+### 10. Test Edge Cases
+
+**Test Red Card Override:**
+- Set Yellow Cards: 2
+- Set Red Cards: 1
+- Expected: Only -3 for red card (yellow cards ignored)
+
+**Test Goalkeeper Negative Points:**
+- Goals Conceded: 10
+- Expected: 7 - 10 = -3 points
+
+**Test Outfield No Bonus:**
+- Goals Conceded: 4
+- Expected: No +1 bonus (only if ≤ 3)
+
+## Expected Results
+
+✅ **Success Indicators:**
+- Stats save without errors
+- "Run Scoring" button completes without errors
+- `GameweekScore` table has entries with calculated totals
+- Scores match manual calculations
+- Captain doubling works correctly
+- Red card overrides yellow card penalty
+
+❌ **Failure Indicators:**
+- Error messages when saving/running scoring
+- No entries in `GameweekScore` table
+- Scores don't match expected calculations
+- Console errors in browser/dev server
+
+## Troubleshooting
+
+**"Unauthorized" error:**
+- Check that you're logged in as admin
+- Verify `isAdmin()` returns true (check first user owns a league)
+
+**No teams found:**
+- Run seed: `npx prisma migrate reset` (this will seed test data)
+
+**Scores are 0:**
+- Verify players have stats entered
+- Check that teams have 5 squad slots filled
+- Ensure players are assigned to slots
+
+**Captain not working:**
+- Verify `isCaptain` is set to `true` in database
+- Check that the slot has a player assigned
