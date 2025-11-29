@@ -145,3 +145,8 @@ model GameweekScore {
 
   @@unique([teamId, gw])
 }
+
+model GlobalSettings {
+  id           Int     @id @default(1)
+  transfersOpen Boolean @default(true)
+}

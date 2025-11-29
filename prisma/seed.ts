@@ -133,6 +133,16 @@ async function main() {
     create: { teamId: team.id, gw: 1, total: 5 }
   });
 
+  // 8) GlobalSettings
+  await prisma.globalSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      transfersOpen: true
+    }
+  });
+
   console.log('Seed complete ✅', { user: user.email, inviteCode: league.inviteCode });
 }
 

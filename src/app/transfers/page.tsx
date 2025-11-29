@@ -91,11 +91,18 @@ if (!team) {
 
   const initialBudget: number = BASE_BUDGET - taken;
 
+  // Fetch global settings for transfers status
+  const globalSettings = await prisma.globalSettings.findUnique({
+    where: { id: 1 },
+  });
+  const transfersOpen = globalSettings?.transfersOpen ?? true;
+
   return (
     <TransfersClient
       squad={squad}
       players={players}
       initialBudget={initialBudget}
+      transfersOpen={transfersOpen}
     />
   );
 }

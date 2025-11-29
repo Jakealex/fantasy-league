@@ -217,6 +217,14 @@ export async function confirmTransfersAction(
     return { ok: false, message: "Budget exceeded." };
   }
 
+  // Check if transfers are open
+  const globalSettings = await prisma.globalSettings.findUnique({
+    where: { id: 1 },
+  });
+  if (!globalSettings || !globalSettings.transfersOpen) {
+    return { ok: false, message: "Transfers are closed." };
+  }
+
   const team = await getTeamForCurrentUser();
 
   try {

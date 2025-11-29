@@ -71,10 +71,12 @@ export default function TransfersClient({
   squad,
   players,
   initialBudget,
+  transfersOpen,
 }: {
   squad: SquadSlot[];
   players: Player[];
   initialBudget: number;
+  transfersOpen: boolean;
 }) {
   const [isSaving, startSaving] = useTransition();
 
@@ -210,7 +212,7 @@ export default function TransfersClient({
 
   // ---------- Confirm ----------
   function handleConfirm(): void {
-    if (!hasUnsavedChanges || isSaving) {
+    if (!hasUnsavedChanges || isSaving || !transfersOpen) {
       return;
     }
     setConfirmMessage(null);
@@ -274,6 +276,14 @@ export default function TransfersClient({
 
       {/* Right: Filters + Budget + List */}
       <section className="lg:col-span-2">
+        {!transfersOpen && (
+          <div className="rounded-xl border border-red-400 bg-red-50 text-red-800 p-4 mb-4">
+            <p className="font-semibold">⚠️ Transfers are currently closed.</p>
+            <p className="text-sm mt-1">
+              You cannot make transfers at this time. Please check back later.
+            </p>
+          </div>
+        )}
         <div className="rounded-xl border p-4 mb-4">
           <div className="flex items-start justify-between gap-4">
             <h2 className="font-semibold mb-3">Player Selection</h2>
@@ -414,12 +424,18 @@ export default function TransfersClient({
                 <div className="mt-2">
                   <button
                     onClick={(): void => handleAdd(p)}
-                    disabled={disabled}
+                    disabled={disabled || !transfersOpen}
                     className={
                       "rounded border px-3 py-1 text-sm " +
-                      (disabled ? "opacity-60 cursor-not-allowed" : "hover:bg-gray-50")
+                      (disabled || !transfersOpen ? "opacity-60 cursor-not-allowed" : "hover:bg-gray-50")
                     }
-                    title={!verdict.ok && verdict.reason ? verdict.reason : undefined}
+                    title={
+                      !transfersOpen
+                        ? "Transfers are closed"
+                        : !verdict.ok && verdict.reason
+                        ? verdict.reason
+                        : undefined
+                    }
                   >
                     {label}
                   </button>
@@ -444,10 +460,10 @@ export default function TransfersClient({
 
           <button
             onClick={handleConfirm}
-            disabled={!hasUnsavedChanges || isSaving}
+            disabled={!hasUnsavedChanges || isSaving || !transfersOpen}
             className={
               "w-full rounded bg-black text-white px-3 py-2 text-sm font-medium " +
-              (!hasUnsavedChanges || isSaving
+              (!hasUnsavedChanges || isSaving || !transfersOpen
                 ? "opacity-60 cursor-not-allowed"
                 : "hover:bg-gray-900 transition-colors")
             }
