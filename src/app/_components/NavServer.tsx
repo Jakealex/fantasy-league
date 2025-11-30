@@ -23,7 +23,7 @@ export default async function Nav() {
         {user ? (
           <>
             <span className="text-sm text-gray-500">
-              {user.firstName || user.email}
+              {user.firstName || user.email || "User"}
             </span>
             <SignOutButton />
           </>
