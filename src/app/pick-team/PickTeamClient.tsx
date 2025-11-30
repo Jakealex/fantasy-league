@@ -18,6 +18,7 @@ type Props = {
     isFinished: boolean;
   };
   isLocked: boolean;
+  teamScore: number | null; // Team's total score for current gameweek
 };
 
 export default function PickTeamClient({
@@ -25,6 +26,7 @@ export default function PickTeamClient({
   onSave,
   currentGameweek,
   isLocked,
+  teamScore,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -125,6 +127,25 @@ export default function PickTeamClient({
       {successMsg && (
         <div className="fixed top-4 right-4 max-w-xs rounded-md border border-green-300 bg-green-50 px-4 py-3 text-sm text-green-900 shadow">
           {successMsg}
+        </div>
+      )}
+
+      {/* Team Score Display */}
+      {teamScore !== null && (
+        <div className="rounded-xl border border-blue-400 bg-blue-50 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-blue-900">
+                Gameweek {currentGameweek.number} Score
+              </h3>
+              <p className="text-xs text-blue-700 mt-1">
+                Your team's total points for this gameweek
+              </p>
+            </div>
+            <div className="text-3xl font-bold text-blue-900">
+              {teamScore}
+            </div>
+          </div>
         </div>
       )}
 
@@ -241,7 +262,7 @@ function LineupCard({
             <span className="font-mono">R{player.price.toFixed(1)}</span>
           </div>
           <div className="mt-2 text-xs text-gray-500">
-            Total points: {player.totalPoints ?? 0}
+            Gameweek points: {player.gameweekPoints ?? 0}
           </div>
         </div>
       </div>

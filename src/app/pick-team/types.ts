@@ -3,7 +3,7 @@ export type PickTeamPlayer = {
   name: string;
   position: "GK" | "OUT";
   price: number;
-  totalPoints?: number;
+  gameweekPoints?: number; // Points for current gameweek
 };
 
 export type PickTeamSlot = {

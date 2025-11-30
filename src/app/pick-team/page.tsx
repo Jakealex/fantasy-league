@@ -150,6 +150,12 @@ export default async function Page() {
   const team = await getTeamForCurrentUser();
   await ensureRequiredSlots(team.id);
 
+  // Fetch current gameweek first (needed for PlayerPoints lookup)
+  const currentGameweek = await getCurrentGameweek();
+  if (!currentGameweek) {
+    throw new Error("No current gameweek configured");
+  }
+
   const slots = await prisma.squadSlot.findMany({
     where: { teamId: team.id },
     include: {
@@ -159,18 +165,24 @@ export default async function Page() {
           name: true,
           position: true,
           price: true,
-          totalPoints: true,
         },
       },
     },
     orderBy: { slotLabel: "asc" },
   });
 
-  // Fetch current gameweek and settings for locking logic
-  const currentGameweek = await getCurrentGameweek();
-  if (!currentGameweek) {
-    throw new Error("No current gameweek configured");
-  }
+  // Fetch PlayerPoints for current gameweek
+  const playerPoints = await (prisma as any).playerPoints.findMany({
+    where: { gameweekId: currentGameweek.id },
+  }) as Array<{ playerId: string; points: number }>;
+
+  // Create map: playerId -> points for this gameweek
+  const pointsByPlayerId = Object.fromEntries(
+    playerPoints.map((pp: { playerId: string; points: number }) => [
+      pp.playerId,
+      pp.points,
+    ])
+  );
 
   const settings = await prisma.globalSettings.findUnique({ where: { id: 1 } });
   const transfersOpen = settings?.transfersOpen ?? true;
@@ -180,6 +192,14 @@ export default async function Page() {
     currentGameweek.isFinished ||
     currentGameweek.deadlineAt < now ||
     !transfersOpen;
+
+  // Fetch team's total score for current gameweek
+  const teamScore = await (prisma as any).gameweekScore.findFirst({
+    where: {
+      teamId: team.id,
+      gameweekId: currentGameweek.id,
+    },
+  });
 
   const squad: PickTeamSlot[] = slots.map((slot) => {
     // Type assertion needed because Prisma include types don't always include all fields
@@ -194,7 +214,7 @@ export default async function Page() {
             name: slot.player.name,
             position: slot.player.position as Position,
             price: slot.player.price,
-            totalPoints: slot.player.totalPoints ?? undefined,
+            gameweekPoints: pointsByPlayerId[slot.player.id] ?? undefined,
           }
         : undefined,
     };
@@ -232,6 +252,7 @@ export default async function Page() {
           isFinished: currentGameweek.isFinished,
         }}
         isLocked={isLocked}
+        teamScore={teamScore?.total ?? null}
       />
     </main>
   );
