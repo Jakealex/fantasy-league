@@ -14,6 +14,8 @@ export async function getCurrentUser() {
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
+    console.log('[getCurrentUser] Session token exists:', !!sessionToken);
+
     if (!sessionToken) {
       return null;
     }
@@ -36,6 +38,8 @@ export async function getCurrentUser() {
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
+
+    console.log('[getCurrentUser] User found:', user ? { id: user.id, email: user.email, firstName: user.firstName } : 'null');
 
     if (!user) {
       return null;

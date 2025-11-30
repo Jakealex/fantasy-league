@@ -16,10 +16,8 @@ const links = [
 export default async function Nav() {
   const user = await getCurrentUser();
   
-  // Debug logging (remove in production if needed)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[Nav] User:', user ? { id: user.id, email: user.email, firstName: user.firstName } : 'null');
-  }
+  // Debug logging for Vercel logs
+  console.log('[Nav] User:', user ? { id: user.id, email: user.email, firstName: user.firstName } : 'null');
 
   return (
     <nav className="flex gap-6 items-center p-4 border-b">
