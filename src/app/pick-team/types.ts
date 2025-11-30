@@ -7,6 +7,8 @@ export type PickTeamPlayer = {
 };
 
 export type PickTeamSlot = {
+  id: string;
   slotLabel: string;
+  isCaptain: boolean;
   player?: PickTeamPlayer;
 };

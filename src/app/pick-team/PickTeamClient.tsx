@@ -1,6 +1,8 @@
 "use client";
 
 import { useTransition, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { setCaptainAction } from "./actions";
 import type { PickTeamSlot } from "./types";
 
 const REQUIRED_SLOT_LABELS = ["GK1", "OUT1", "OUT2", "OUT3", "OUT4"] as const;
@@ -10,12 +12,26 @@ type SaveLineupResult = { ok: boolean; message: string };
 type Props = {
   slots: PickTeamSlot[];
   onSave: (formData: FormData) => Promise<SaveLineupResult>;
+  currentGameweek: {
+    number: number;
+    deadlineAt: string | Date;
+    isFinished: boolean;
+  };
+  isLocked: boolean;
 };
 
-export default function PickTeamClient({ slots, onSave }: Props) {
+export default function PickTeamClient({
+  slots,
+  onSave,
+  currentGameweek,
+  isLocked,
+}: Props) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isCaptainPending, startCaptainTransition] = useTransition();
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [successMsg, setSuccessMsg] = useState<string>("");
+  const [captainError, setCaptainError] = useState<string>("");
 
   const gkSlot = useMemo<PickTeamSlot | undefined>(
     () => slots.find((slot) => slot.slotLabel === "GK1"),
@@ -24,9 +40,32 @@ export default function PickTeamClient({ slots, onSave }: Props) {
 
   const outfieldSlots = useMemo<PickTeamSlot[]>(() => {
     return REQUIRED_SLOT_LABELS.filter((label) => label.startsWith("OUT")).map((label) => {
-      return slots.find((slot) => slot.slotLabel === label) ?? { slotLabel: label };
+      return (
+        slots.find((slot) => slot.slotLabel === label) ?? {
+          id: "",
+          slotLabel: label,
+          isCaptain: false,
+        }
+      );
     });
   }, [slots]);
+
+  const handleSetCaptain = (slotId: string) => {
+    if (isLocked || isCaptainPending || !slotId) return;
+
+    startCaptainTransition(async () => {
+      try {
+        setCaptainError("");
+        await setCaptainAction(slotId);
+        router.refresh();
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to set captain";
+        setCaptainError(message);
+        setTimeout(() => setCaptainError(""), 3000);
+      }
+    });
+  };
 
   const hasEmptySlots = useMemo<boolean>(
     () => REQUIRED_SLOT_LABELS.some((label) => !slots.find((slot) => slot.slotLabel === label)?.player),
@@ -89,10 +128,30 @@ export default function PickTeamClient({ slots, onSave }: Props) {
         </div>
       )}
 
+      {isLocked && (
+        <div className="rounded-xl border border-red-400 bg-red-50 p-4 text-sm text-red-800">
+          <p className="font-semibold">Captain selection is locked</p>
+          <p className="mt-1">
+            Captain changes are locked for this gameweek (deadline passed, gameweek finished, or transfers closed).
+          </p>
+        </div>
+      )}
+
+      {captainError && (
+        <div className="rounded-xl border border-red-400 bg-red-50 p-4 text-sm text-red-800">
+          {captainError}
+        </div>
+      )}
+
       <section className="rounded-xl border p-4">
         <h2 className="font-semibold">Goalkeeper</h2>
         <div className="mt-3">
-          <LineupCard slot={gkSlot ?? { slotLabel: "GK1" }} />
+          <LineupCard
+            slot={gkSlot ?? { id: "", slotLabel: "GK1", isCaptain: false }}
+            onSetCaptain={handleSetCaptain}
+            isLocked={isLocked}
+            isPending={isCaptainPending}
+          />
         </div>
       </section>
 
@@ -100,7 +159,13 @@ export default function PickTeamClient({ slots, onSave }: Props) {
         <h2 className="font-semibold">Outfield</h2>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {outfieldSlots.map((slot) => (
-            <LineupCard key={slot.slotLabel} slot={slot} />
+            <LineupCard
+              key={slot.slotLabel}
+              slot={slot}
+              onSetCaptain={handleSetCaptain}
+              isLocked={isLocked}
+              isPending={isCaptainPending}
+            />
           ))}
         </div>
       </section>
@@ -133,7 +198,17 @@ export default function PickTeamClient({ slots, onSave }: Props) {
   );
 }
 
-function LineupCard({ slot }: { slot: PickTeamSlot }) {
+function LineupCard({
+  slot,
+  onSetCaptain,
+  isLocked,
+  isPending,
+}: {
+  slot: PickTeamSlot;
+  onSetCaptain: (slotId: string) => void;
+  isLocked: boolean;
+  isPending: boolean;
+}) {
   if (!slot.player) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center text-sm text-gray-500">
@@ -144,18 +219,49 @@ function LineupCard({ slot }: { slot: PickTeamSlot }) {
   }
 
   const { player } = slot;
+  const canSetCaptain = !isLocked && !isPending && slot.id;
+
   return (
     <div className="rounded-lg border p-4">
-      <div className="text-xs uppercase tracking-wide text-gray-500">
-        {slot.slotLabel}
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="text-xs uppercase tracking-wide text-gray-500">
+            {slot.slotLabel}
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <div className="text-base font-semibold">{player.name}</div>
+            {slot.isCaptain && (
+              <span className="rounded bg-yellow-300 px-2 py-0.5 text-xs font-semibold">
+                Captain
+              </span>
+            )}
+          </div>
+          <div className="mt-2 flex items-center justify-between text-sm text-gray-600">
+            <span>{player.position === "GK" ? "Goalkeeper" : "Outfield"}</span>
+            <span className="font-mono">R{player.price.toFixed(1)}</span>
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            Total points: {player.totalPoints ?? 0}
+          </div>
+        </div>
       </div>
-      <div className="mt-1 text-base font-semibold">{player.name}</div>
-      <div className="mt-2 flex items-center justify-between text-sm text-gray-600">
-        <span>{player.position === "GK" ? "Goalkeeper" : "Outfield"}</span>
-        <span className="font-mono">R{player.price.toFixed(1)}</span>
-      </div>
-      <div className="mt-2 text-xs text-gray-500">
-        Total points: {player.totalPoints ?? 0}
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => onSetCaptain(slot.id)}
+          disabled={!canSetCaptain}
+          className={
+            "w-full rounded border px-3 py-1.5 text-xs font-medium transition-colors " +
+            (slot.isCaptain
+              ? "border-yellow-400 bg-yellow-50 text-yellow-800"
+              : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50") +
+            (!canSetCaptain
+              ? " cursor-not-allowed opacity-50"
+              : "")
+          }
+        >
+          {slot.isCaptain ? "Captain" : "Set Captain"}
+        </button>
       </div>
     </div>
   );

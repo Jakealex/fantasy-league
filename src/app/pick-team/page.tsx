@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
+import { getCurrentGameweek } from "@/lib/gameweek";
 import type { Position } from "@/types/fantasy";
 import PickTeamClient from "./PickTeamClient";
 import type { PickTeamSlot } from "./types";
@@ -165,37 +166,73 @@ export default async function Page() {
     orderBy: { slotLabel: "asc" },
   });
 
-  const squad: PickTeamSlot[] = slots.map((slot) => ({
-    slotLabel: slot.slotLabel,
-    player: slot.player
-      ? {
-          id: slot.player.id,
-          name: slot.player.name,
-          position: slot.player.position as Position,
-          price: slot.player.price,
-          totalPoints: slot.player.totalPoints ?? undefined,
-        }
-      : undefined,
-  }));
+  // Fetch current gameweek and settings for locking logic
+  const currentGameweek = await getCurrentGameweek();
+  if (!currentGameweek) {
+    throw new Error("No current gameweek configured");
+  }
+
+  const settings = await prisma.globalSettings.findUnique({ where: { id: 1 } });
+  const transfersOpen = settings?.transfersOpen ?? true;
+
+  const now = new Date();
+  const isLocked =
+    currentGameweek.isFinished ||
+    currentGameweek.deadlineAt < now ||
+    !transfersOpen;
+
+  const squad: PickTeamSlot[] = slots.map((slot) => {
+    // Type assertion needed because Prisma include types don't always include all fields
+    const slotWithCaptain = slot as typeof slot & { isCaptain: boolean };
+    return {
+      id: slot.id,
+      slotLabel: slot.slotLabel,
+      isCaptain: slotWithCaptain.isCaptain ?? false,
+      player: slot.player
+        ? {
+            id: slot.player.id,
+            name: slot.player.name,
+            position: slot.player.position as Position,
+            price: slot.player.price,
+            totalPoints: slot.player.totalPoints ?? undefined,
+          }
+        : undefined,
+    };
+  });
 
   console.log(
     "[pick-team] fetched slots",
     squad.map((slot) => ({
       slotLabel: slot.slotLabel,
       playerId: slot.player?.id ?? null,
+      isCaptain: slot.isCaptain,
     }))
   );
 
   return (
     <main className="p-6 space-y-6">
       <header>
-        <h1 className="text-2xl font-bold">Pick Team</h1>
+        <h1 className="text-2xl font-bold">
+          Pick Team – Gameweek {currentGameweek.number}
+        </h1>
         <p className="mt-2 text-gray-600">
           Review your confirmed squad and save the lineup.
         </p>
+        <p className="mt-1 text-sm text-gray-500">
+          Deadline: {new Date(currentGameweek.deadlineAt).toLocaleString()}
+        </p>
       </header>
 
-      <PickTeamClient slots={squad} onSave={saveLineupAction} />
+      <PickTeamClient
+        slots={squad}
+        onSave={saveLineupAction}
+        currentGameweek={{
+          number: currentGameweek.number,
+          deadlineAt: currentGameweek.deadlineAt,
+          isFinished: currentGameweek.isFinished,
+        }}
+        isLocked={isLocked}
+      />
     </main>
   );
 }
