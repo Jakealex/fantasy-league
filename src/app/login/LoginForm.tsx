@@ -24,7 +24,8 @@ export default function LoginForm() {
           // Force full page reload to ensure cookie is picked up
           window.location.href = "/";
         } else {
-          setError("error" in result ? result.error : "Failed to sign in");
+          const errorMessage = result && "error" in result ? result.error : "Failed to sign in";
+          setError(errorMessage || "Failed to sign in");
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to sign in");
