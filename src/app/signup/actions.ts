@@ -66,7 +66,7 @@ export async function signupAction(form: {
   }
 
   // Create user, team, and league memberships in a transaction
-  const result = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     // Create user
     const user = await tx.user.create({
       data: {

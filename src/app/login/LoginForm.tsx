@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { loginAction } from "./actions";
 import Link from "next/link";
 
 export default function LoginForm() {
-  const router = useRouter();
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -26,7 +24,7 @@ export default function LoginForm() {
           // Force full page reload to ensure cookie is picked up
           window.location.href = "/";
         } else {
-          setError(result?.error || "Failed to sign in");
+          setError("error" in result ? result.error : "Failed to sign in");
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to sign in");
@@ -92,7 +90,7 @@ export default function LoginForm() {
       </button>
 
       <div className="text-center text-sm text-gray-600">
-        Don't have an account?{" "}
+        Don&apos;t have an account?{" "}
         <Link href="/signup" className="text-blue-600 hover:text-blue-800 underline">
           Sign up
         </Link>

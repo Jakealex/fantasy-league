@@ -2,7 +2,6 @@
 
 import { signIn } from "@/lib/auth";
 import { getCurrentUser } from "@/lib/auth";
-import { redirect } from "next/navigation";
 
 export async function loginAction(form: { email: string; password: string }) {
   // Check if already logged in
