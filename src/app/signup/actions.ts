@@ -50,13 +50,78 @@ export async function signupAction(form: {
   // Hash password
   const passwordHash = await hashPassword(password);
 
-  // Find leagues
-  const overall = await prisma.league.findFirst({ where: { type: "OVERALL" } });
-  const tribe = await prisma.league.findFirst({ where: { type: "TRIBE", shevet } });
-  const roleLeague = await prisma.league.findFirst({ where: { type: "ROLE", role } });
+  // Find or create leagues (idempotent - safe to run multiple times)
+  // Use upsert to handle race conditions where multiple signups happen simultaneously
+  let overall = await prisma.league.findFirst({ where: { type: "OVERALL" } });
+  if (!overall) {
+    try {
+      overall = await prisma.league.upsert({
+        where: { name: "Overall League" },
+        update: {},
+        create: {
+          name: "Overall League",
+          type: "OVERALL",
+          inviteCode: null,
+          ownerId: null,
+        },
+      });
+    } catch (error) {
+      // If upsert fails, try to find it again (another process might have created it)
+      overall = await prisma.league.findFirst({ where: { type: "OVERALL" } });
+      if (!overall) {
+        console.error("[signup] Failed to create Overall League:", error);
+        return { ok: false, error: "Failed to initialize leagues. Please try again." };
+      }
+    }
+  }
 
-  if (!overall || !tribe || !roleLeague) {
-    return { ok: false, error: "Leagues not configured. Please contact admin." };
+  let tribe = await prisma.league.findFirst({ where: { type: "TRIBE", shevet } });
+  if (!tribe) {
+    try {
+      tribe = await prisma.league.upsert({
+        where: { name: shevet },
+        update: {},
+        create: {
+          name: shevet,
+          type: "TRIBE",
+          shevet: shevet,
+          inviteCode: null,
+          ownerId: null,
+        },
+      });
+    } catch (error) {
+      // If upsert fails, try to find it again
+      tribe = await prisma.league.findFirst({ where: { type: "TRIBE", shevet } });
+      if (!tribe) {
+        console.error(`[signup] Failed to create Tribe League (${shevet}):`, error);
+        return { ok: false, error: `Failed to initialize ${shevet} league. Please try again.` };
+      }
+    }
+  }
+
+  let roleLeague = await prisma.league.findFirst({ where: { type: "ROLE", role } });
+  if (!roleLeague) {
+    const roleLeagueName = role === "Maddie" ? "Maddies League" : "Channies League";
+    try {
+      roleLeague = await prisma.league.upsert({
+        where: { name: roleLeagueName },
+        update: {},
+        create: {
+          name: roleLeagueName,
+          type: "ROLE",
+          role: role,
+          inviteCode: null,
+          ownerId: null,
+        },
+      });
+    } catch (error) {
+      // If upsert fails, try to find it again
+      roleLeague = await prisma.league.findFirst({ where: { type: "ROLE", role } });
+      if (!roleLeague) {
+        console.error(`[signup] Failed to create Role League (${role}):`, error);
+        return { ok: false, error: `Failed to initialize ${role} league. Please try again.` };
+      }
+    }
   }
 
   // Generate unique team name
