@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import SignOutButton from "./SignOutButton";
 import NavClient from "./NavClient";
+import { unstable_noStore as noStore } from "next/cache";
 
 export const dynamic = 'force-dynamic';
 
@@ -14,10 +15,13 @@ const links = [
 ];
 
 export default async function Nav() {
+  noStore(); // Prevent any caching
+  console.log('[Nav] Component executing at:', new Date().toISOString());
   const user = await getCurrentUser();
   
   // Debug logging for Vercel logs
   console.log('[Nav] User:', user ? { id: user.id, email: user.email, firstName: user.firstName } : 'null');
+  console.log('[Nav] Will render:', user ? 'LOGGED IN' : 'LOGGED OUT');
 
   return (
     <nav className="flex gap-6 items-center p-4 border-b">
