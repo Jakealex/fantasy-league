@@ -139,7 +139,7 @@ export default function PickTeamClient({
                 Gameweek {currentGameweek.number} Score
               </h3>
               <p className="text-xs text-blue-700 mt-1">
-                Your team's total points for this gameweek
+                Your team&apos;s total points for this gameweek
               </p>
             </div>
             <div className="text-3xl font-bold text-blue-900">

@@ -27,13 +27,21 @@ async function getTeamForCurrentUser() {
   let league = await prisma.league.findFirst({ where: { ownerId: user.id } });
   if (!league) {
     // If user has no owned league, find any league they're a member of
-    const membership = await prisma.leagueMember.findFirst({
+    // First find a team for this user
+    const userTeam = await prisma.team.findFirst({
       where: { userId: user.id },
-      include: { league: true },
     });
-    if (membership) {
-      league = membership.league;
-    } else {
+    if (userTeam) {
+      // Find a league membership for this team
+      const membership = await prisma.leagueMember.findFirst({
+        where: { teamId: userTeam.id },
+        include: { league: true },
+      });
+      if (membership) {
+        league = membership.league;
+      }
+    }
+    if (!league) {
       throw new Error("User has no league");
     }
   }
@@ -192,9 +200,9 @@ export default async function Page() {
   });
 
   // Fetch PlayerPoints for current gameweek
-  const playerPoints = await (prisma as any).playerPoints.findMany({
+  const playerPoints = await prisma.playerPoints.findMany({
     where: { gameweekId: currentGameweek.id },
-  }) as Array<{ playerId: string; points: number }>;
+  });
 
   // Create map: playerId -> points for this gameweek
   const pointsByPlayerId = Object.fromEntries(
@@ -214,7 +222,7 @@ export default async function Page() {
     !transfersOpen;
 
   // Fetch team's total score for current gameweek
-  const teamScore = await (prisma as any).gameweekScore.findFirst({
+  const teamScore = await prisma.gameweekScore.findFirst({
     where: {
       teamId: team.id,
       gameweekId: currentGameweek.id,

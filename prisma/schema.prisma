@@ -42,16 +42,18 @@ model User {
 
   teams        Team[]
   leaguesOwned League[]       @relation("LeagueOwner")
-  memberships  LeagueMember[]
 }
 
 model League {
   id         String @id @default(cuid())
-  name       String
-  inviteCode String @unique
+  name       String @unique
+  inviteCode String? @unique // Optional for system leagues
+  type       String? // "OVERALL" | "TRIBE" | "ROLE" | "CUSTOM"
+  shevet     String? // For TRIBE leagues
+  role       String? // For ROLE leagues
 
-  ownerId String
-  owner   User   @relation("LeagueOwner", fields: [ownerId], references: [id])
+  ownerId String? // Optional for system leagues
+  owner   User?   @relation("LeagueOwner", fields: [ownerId], references: [id])
 
   teams   Team[]
   members LeagueMember[]
@@ -60,14 +62,14 @@ model League {
 model LeagueMember {
   id String @id @default(cuid())
 
-  userId   String
   leagueId String
-  role     String
+  teamId   String
+  role     String? // Optional, for custom roles
 
-  user   User   @relation(fields: [userId], references: [id])
   league League @relation(fields: [leagueId], references: [id])
+  team   Team   @relation(fields: [teamId], references: [id])
 
-  @@unique([leagueId, userId])
+  @@unique([leagueId, teamId])
 }
 
 model Team {
@@ -77,15 +79,16 @@ model Team {
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
-  leagueId String
-  league   League @relation(fields: [leagueId], references: [id])
+  leagueId String? // Optional - teams can exist without a primary league
+  league   League? @relation(fields: [leagueId], references: [id])
 
   budget Float @default(34)
 
   slots          SquadSlot[]
   gameweekScores GameweekScore[]
+  memberships    LeagueMember[]
 
-  @@unique([userId, leagueId]) // ✅ add this line
+  @@unique([userId, leagueId]) // Still unique per user per league
 }
 
 model Player {

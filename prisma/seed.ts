@@ -14,6 +14,59 @@ function randomCode(len = 8) {
 }
 
 async function main() {
+  // 0) Create system leagues (10 leagues total)
+  const overallLeague = await prisma.league.upsert({
+    where: { name: "Overall League" },
+    update: {},
+    create: {
+      name: "Overall League",
+      type: "OVERALL",
+      inviteCode: null,
+      ownerId: null,
+    },
+  });
+
+  const shevatim = ["Ktan tanim", "Gurim", "Roim", "Moledet", "Chaim", "Reim", "Kaveh"];
+  const tribeLeagues = await Promise.all(
+    shevatim.map((shevet) =>
+      prisma.league.upsert({
+        where: { name: shevet },
+        update: {},
+        create: {
+          name: shevet,
+          type: "TRIBE",
+          shevet: shevet,
+          inviteCode: null,
+          ownerId: null,
+        },
+      })
+    )
+  );
+
+  const maddiesLeague = await prisma.league.upsert({
+    where: { name: "Maddies League" },
+    update: {},
+    create: {
+      name: "Maddies League",
+      type: "ROLE",
+      role: "Maddie",
+      inviteCode: null,
+      ownerId: null,
+    },
+  });
+
+  const channiesLeague = await prisma.league.upsert({
+    where: { name: "Channies League" },
+    update: {},
+    create: {
+      name: "Channies League",
+      type: "ROLE",
+      role: "Channie",
+      inviteCode: null,
+      ownerId: null,
+    },
+  });
+
   // 1) User
   // Generate real password hash for 'password123'
   const passwordHash = await hash('password123', 10);
@@ -25,11 +78,15 @@ async function main() {
     },
     create: {
       email: 'admin@example.com',
-      passwordHash: passwordHash
+      passwordHash: passwordHash,
+      firstName: 'Admin',
+      lastName: 'User',
+      shevet: 'Ktan tanim',
+      role: 'Maddie',
     }
   });
 
-  // 2) League
+  // 2) Create a demo league for the admin user
   const invite = 'DEMO' + randomCode(4);
   const league = await prisma.league.upsert({
     where: { inviteCode: invite },
@@ -37,18 +94,12 @@ async function main() {
     create: {
       name: 'Demo League',
       inviteCode: invite,
+      type: 'CUSTOM',
       ownerId: user.id
     }
   });
 
-  // 3) Membership
-  await prisma.leagueMember.upsert({
-    where: { leagueId_userId: { leagueId: league.id, userId: user.id } },
-    update: {},
-    create: { leagueId: league.id, userId: user.id, role: 'admin' }
-  });
-
-  // 4) Team
+  // 3) Team (for demo league)
   const team = await prisma.team.upsert({
     where: { userId_leagueId: { userId: user.id, leagueId: league.id } },
     update: {},
@@ -58,6 +109,13 @@ async function main() {
       leagueId: league.id,
       budget: 100
     }
+  });
+
+  // 4) Membership (for demo league)
+  await prisma.leagueMember.upsert({
+    where: { leagueId_teamId: { leagueId: league.id, teamId: team.id } },
+    update: {},
+    create: { leagueId: league.id, teamId: team.id, role: 'admin' }
   });
 
   // 5) Players with names

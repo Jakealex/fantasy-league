@@ -239,7 +239,7 @@ export async function confirmTransfersAction(
   const team = await getTeamForCurrentUser();
 
   try {
-    const transactionResults = await prisma.$transaction([
+    await prisma.$transaction([
       ...REQUIRED_SLOT_LABELS.map((slotLabel) => {
         const slot = submitted.find((s) => s.slotLabel === slotLabel);
         const playerId = slot?.playerId ?? null;

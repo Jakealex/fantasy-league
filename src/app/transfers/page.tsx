@@ -51,13 +51,21 @@ export default async function Page() {
   let league = await prisma.league.findFirst({ where: { ownerId: user.id } });
   if (!league) {
     // If user has no owned league, find any league they're a member of
-    const membership = await prisma.leagueMember.findFirst({
+    // First find a team for this user
+    const userTeam = await prisma.team.findFirst({
       where: { userId: user.id },
-      include: { league: true },
     });
-    if (membership) {
-      league = membership.league;
-    } else {
+    if (userTeam) {
+      // Find a league membership for this team
+      const membership = await prisma.leagueMember.findFirst({
+        where: { teamId: userTeam.id },
+        include: { league: true },
+      });
+      if (membership) {
+        league = membership.league;
+      }
+    }
+    if (!league) {
       throw new Error("User has no league");
     }
   }
