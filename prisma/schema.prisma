@@ -30,6 +30,15 @@ model User {
   id           String @id @default(cuid())
   email        String @unique
   passwordHash String
+  firstName    String?
+  lastName     String?
+  shevet       String?
+  role         String? // "Maddie" | "Channie"
+  emailVerified DateTime?
+
+  // Password reset fields
+  resetToken        String?
+  resetTokenExpires DateTime?
 
   teams        Team[]
   leaguesOwned League[]       @relation("LeagueOwner")

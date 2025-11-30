@@ -1,30 +1,22 @@
-import { prisma } from "./prisma";
+import { getCurrentUser } from "./auth";
 
 /**
- * Check if the current user (first user for now) is an admin.
- * TODO: Replace with real session-based auth when authentication is implemented.
+ * Admin email addresses (comma-separated in env, or default list)
+ */
+const ADMIN_EMAILS = (
+  process.env.ADMIN_EMAILS ||
+  "jakeshapiro007@gmail.com,jboner2111@gmail.com"
+).split(",").map((email) => email.trim().toLowerCase());
+
+/**
+ * Check if the current user is an admin.
  */
 export async function isAdmin(): Promise<boolean> {
   try {
-    // For now, check if the first user is a league owner or has admin role
-    const user = await prisma.user.findFirst();
+    const user = await getCurrentUser();
     if (!user) return false;
 
-    // Check if user owns any leagues
-    const ownedLeague = await prisma.league.findFirst({
-      where: { ownerId: user.id },
-    });
-    if (ownedLeague) return true;
-
-    // Check if user has admin role in any league
-    const adminMembership = await prisma.leagueMember.findFirst({
-      where: {
-        userId: user.id,
-        role: "admin",
-      },
-    });
-
-    return !!adminMembership;
+    return ADMIN_EMAILS.includes(user.email.toLowerCase());
   } catch (error) {
     console.error("[isAdmin] Error:", error);
     return false;

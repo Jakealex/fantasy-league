@@ -1,5 +1,6 @@
 // prisma/seed.ts
 import { PrismaClient } from '@prisma/client';
+import { hash } from 'bcryptjs';
 const prisma = new PrismaClient();
 
 // simple literal types to match your enums
@@ -14,13 +15,17 @@ function randomCode(len = 8) {
 
 async function main() {
   // 1) User
+  // Generate real password hash for 'password123'
+  const passwordHash = await hash('password123', 10);
+  
   const user = await prisma.user.upsert({
     where: { email: 'admin@example.com' },
-    update: {},
+    update: {
+      passwordHash: passwordHash, // Update password hash if user exists
+    },
     create: {
       email: 'admin@example.com',
-      // DEMO hash – replace with a real bcrypt hash later
-      passwordHash: '$2a$10$abcdefghijklmnopqrstuv'
+      passwordHash: passwordHash
     }
   });
 

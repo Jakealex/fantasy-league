@@ -1,184 +1,238 @@
-# Testing Guide: Scoring Engine
+# Testing Guide - Authentication System
 
-## Prerequisites
-1. Database is seeded (run `npx prisma migrate reset` if needed)
-2. Dev server is running (`npm run dev`)
-3. You have admin access (first user in database is admin by default)
+## 🚀 Quick Start
 
-## Step-by-Step Testing
+### 1. Update Seed File (Create Test User)
 
-### 1. Start the Dev Server
+First, let's update the seed to create a test user with a real password hash:
+
+```bash
+# We'll create a script to hash a password
+```
+
+### 2. Test User Credentials
+
+**Test User:**
+- Email: `admin@example.com`
+- Password: `password123` (or whatever you set)
+
+**Admin Users (already configured):**
+- `jakeshapiro007@gmail.com`
+- `jboner2111@gmail.com`
+
+---
+
+## 📋 Testing Steps
+
+### Step 1: Create Test User
+
+Run the seed to create a test user:
+
+```bash
+npm run db:seed
+```
+
+**OR** manually create a user via Prisma Studio:
+
+```bash
+npx prisma studio
+```
+
+Then create a user with:
+- Email: `test@example.com`
+- Password Hash: (use the script below to generate)
+
+### Step 2: Generate Password Hash
+
+Create a quick script to hash passwords:
+
+```bash
+node -e "const bcrypt = require('bcryptjs'); bcrypt.hash('password123', 10).then(h => console.log(h))"
+```
+
+Copy the hash and use it in Prisma Studio or seed file.
+
+### Step 3: Start Dev Server
+
 ```bash
 npm run dev
 ```
 
-### 2. Access Admin Gameweeks Page
-Navigate to: `http://localhost:3000/admin/gameweeks`
+Server should start at `http://localhost:3000`
 
-You should see:
-- List of gameweeks (or create one if none exist)
-- Each gameweek should have a link to "Enter Points"
+---
 
-### 3. Create/Select a Gameweek
-- If no gameweek exists, click "Create Gameweek"
-- Fill in:
-  - Number: 1
-  - Name: "Gameweek 1" (optional)
-  - Start Date: Any future date
-  - Deadline: Any future date
-  - Mark as Current: Yes
-- Click "Create Gameweek"
+## 🧪 Test Scenarios
 
-### 4. Enter Player Stats
-- Click "Enter Points" for your gameweek
-- You should see a table with all players and columns:
-  - Player, Team, Position
-  - Goals, Assists, Own Goals, Yellow Cards, Red Cards, Goals Conceded
-  - Points
+### ✅ Test 1: Access Protected Route (Not Logged In)
 
-**Test Data Example:**
-For a goalkeeper (e.g., "John Keeper"):
-- Goals: 0
-- Assists: 0
-- Own Goals: 0
-- Yellow Cards: 0
-- Red Cards: 0
-- Goals Conceded: 2
-- Points: 0 (will be calculated)
+1. Open browser in **incognito/private mode**
+2. Navigate to: `http://localhost:3000/pick-team`
+3. **Expected:** Redirected to `/login`
 
-For an outfield player (e.g., "Josh Berson"):
-- Goals: 2
-- Assists: 1
-- Own Goals: 0
-- Yellow Cards: 1
-- Red Cards: 0
-- Goals Conceded: 2 (team conceded 2 goals)
-- Points: 0
+### ✅ Test 2: Login with Valid Credentials
 
-### 5. Set a Captain
-You need to set a captain for at least one team. You can do this via:
-- Database directly, OR
-- Update the pick-team page to allow captain selection
+1. Go to: `http://localhost:3000/login`
+2. Enter:
+   - Email: `admin@example.com` (or your test user)
+   - Password: `password123`
+3. Click "Sign In"
+4. **Expected:** Redirected to home page (`/`)
+5. **Expected:** "Sign Out" button appears in nav
 
-**Quick DB Test:**
-```sql
--- Find a team and slot
-UPDATE "SquadSlot" 
-SET "isCaptain" = true 
-WHERE "slotLabel" = 'OUT1' 
-AND "teamId" = (SELECT id FROM "Team" LIMIT 1);
+### ✅ Test 3: Login with Invalid Credentials
+
+1. Go to: `http://localhost:3000/login`
+2. Enter wrong email/password
+3. Click "Sign In"
+4. **Expected:** Error message: "Invalid email or password"
+
+### ✅ Test 4: Access Protected Routes (Logged In)
+
+1. After logging in, navigate to:
+   - `/pick-team` ✅ Should work
+   - `/transfers` ✅ Should work
+   - `/admin/gameweeks` ✅ Should work (if admin)
+   - `/admin/transfers` ✅ Should work (if admin)
+
+### ✅ Test 5: Sign Out
+
+1. Click "Sign Out" button in nav
+2. **Expected:** Redirected to `/login`
+3. Try accessing `/pick-team` again
+4. **Expected:** Redirected back to `/login`
+
+### ✅ Test 6: Password Reset Flow
+
+#### 6a. Request Reset Token
+
+1. Go to: `http://localhost:3000/forgot-password`
+2. Enter a valid email (e.g., `admin@example.com`)
+3. Click "Send Reset Link"
+4. **Expected:** Token displayed on page (since no email service yet)
+5. Copy the token
+
+#### 6b. Reset Password
+
+1. Click the reset link or go to: `http://localhost:3000/reset-password?token=YOUR_TOKEN`
+2. Enter new password (min 6 chars)
+3. Confirm password
+4. Click "Reset Password"
+5. **Expected:** Auto-logged in and redirected to home
+
+#### 6c. Login with New Password
+
+1. Sign out
+2. Try logging in with old password
+3. **Expected:** Should fail
+4. Try logging in with new password
+5. **Expected:** Should succeed
+
+### ✅ Test 7: Admin Access
+
+1. Create a user with email: `jakeshapiro007@gmail.com` (or `jboner2111@gmail.com`)
+2. Login with that email
+3. Navigate to: `/admin/gameweeks`
+4. **Expected:** Should have access (admin page loads)
+5. Create a user with different email (not admin)
+6. Login with that email
+7. Navigate to: `/admin/gameweeks`
+8. **Expected:** Redirected to `/` (not admin)
+
+### ✅ Test 8: Session Persistence
+
+1. Login successfully
+2. Close browser tab (but keep browser open)
+3. Open new tab, go to: `http://localhost:3000/pick-team`
+4. **Expected:** Should still be logged in (session persists)
+
+### ✅ Test 9: Expired Reset Token
+
+1. Request password reset
+2. Wait 24+ hours (or manually expire token in DB)
+3. Try to use the reset token
+4. **Expected:** Error: "Invalid or expired reset token"
+
+---
+
+## 🛠️ Helper Scripts
+
+### Create Password Hash Script
+
+Create `scripts/hash-password.js`:
+
+```js
+const bcrypt = require('bcryptjs');
+const password = process.argv[2] || 'password123';
+
+bcrypt.hash(password, 10).then(hash => {
+  console.log('Password:', password);
+  console.log('Hash:', hash);
+});
 ```
 
-Or use Prisma Studio:
-```bash
-npx prisma studio
-```
-- Navigate to SquadSlot table
-- Find a slot with a player
-- Set `isCaptain` to `true`
+Run: `node scripts/hash-password.js yourpassword`
 
-### 6. Save Stats
-- Click "Save All" button
-- You should see: "Stats saved successfully!"
+### Update Seed File
 
-### 7. Run Scoring
-- Click the "Run Scoring" button (blue button above the table)
-- Wait for the message: "Scoring completed successfully!"
+Update `prisma/seed.ts` to use real password hash:
 
-### 8. Verify Scores Were Calculated
+```ts
+import { hash } from 'bcryptjs';
 
-**Option A: Check Database**
-```bash
-npx prisma studio
-```
-- Navigate to `GameweekScore` table
-- You should see rows with calculated `total` values
-
-**Option B: Query via Terminal**
-```bash
-npx prisma db execute --stdin
-```
-Then paste:
-```sql
-SELECT 
-  t.name as team_name,
-  gs.total as score,
-  g.number as gameweek
-FROM "GameweekScore" gs
-JOIN "Team" t ON t.id = gs."teamId"
-JOIN "Gameweek" g ON g.id = gs."gameweekId"
-ORDER BY gs.total DESC;
+// In main():
+const passwordHash = await hash('password123', 10);
+const user = await prisma.user.upsert({
+  where: { email: 'admin@example.com' },
+  update: {},
+  create: {
+    email: 'admin@example.com',
+    passwordHash: passwordHash, // Real hash
+  }
+});
 ```
 
-### 9. Manual Calculation Verification
+---
 
-**Example Calculation (Goalkeeper with 2 goals conceded, NOT captain):**
-- Goals: 0 × 5 = 0
-- Assists: 0 × 3 = 0
-- Own Goals: 0 × -2 = 0
-- Yellow Cards: 0 × -1 = 0
-- Red Cards: 0 (no red card)
-- Goalkeeper bonus: 7 - 2 = 5
-- **Total: 5 points**
+## 🐛 Troubleshooting
 
-**Example Calculation (Outfield with 2 goals, 1 assist, 1 yellow, 2 conceded, NOT captain):**
-- Goals: 2 × 5 = 10
-- Assists: 1 × 3 = 3
-- Own Goals: 0 × -2 = 0
-- Yellow Cards: 1 × -1 = -1
-- Red Cards: 0
-- Outfield bonus: +1 (goalsConceded ≤ 3)
-- **Total: 13 points**
+### Issue: "Invalid email or password" even with correct credentials
 
-**Example Calculation (Same player, but IS captain):**
-- Base total: 13
-- Captain multiplier: 13 × 2 = **26 points**
+**Solution:** Check that password hash in DB matches. Regenerate hash and update user.
 
-### 10. Test Edge Cases
+### Issue: Redirect loop on login
 
-**Test Red Card Override:**
-- Set Yellow Cards: 2
-- Set Red Cards: 1
-- Expected: Only -3 for red card (yellow cards ignored)
+**Solution:** Check that `getCurrentUser()` is working. Check browser console for errors.
 
-**Test Goalkeeper Negative Points:**
-- Goals Conceded: 10
-- Expected: 7 - 10 = -3 points
+### Issue: "Sign Out" button not appearing
 
-**Test Outfield No Bonus:**
-- Goals Conceded: 4
-- Expected: No +1 bonus (only if ≤ 3)
+**Solution:** Check that session cookie is being set. Check browser DevTools > Application > Cookies.
 
-## Expected Results
+### Issue: Admin access not working
 
-✅ **Success Indicators:**
-- Stats save without errors
-- "Run Scoring" button completes without errors
-- `GameweekScore` table has entries with calculated totals
-- Scores match manual calculations
-- Captain doubling works correctly
-- Red card overrides yellow card penalty
+**Solution:** 
+1. Verify email matches exactly (case-insensitive)
+2. Check `src/lib/admin.ts` has correct emails
+3. Check environment variable `ADMIN_EMAILS` if set
 
-❌ **Failure Indicators:**
-- Error messages when saving/running scoring
-- No entries in `GameweekScore` table
-- Scores don't match expected calculations
-- Console errors in browser/dev server
+---
 
-## Troubleshooting
+## 📝 Notes
 
-**"Unauthorized" error:**
-- Check that you're logged in as admin
-- Verify `isAdmin()` returns true (check first user owns a league)
+- **Session Duration:** 7 days
+- **Reset Token Expiry:** 24 hours
+- **Password Min Length:** 6 characters
+- **Admin Emails:** Hardcoded in `src/lib/admin.ts` (can override with env var)
 
-**No teams found:**
-- Run seed: `npx prisma migrate reset` (this will seed test data)
+---
 
-**Scores are 0:**
-- Verify players have stats entered
-- Check that teams have 5 squad slots filled
-- Ensure players are assigned to slots
+## ✅ Checklist
 
-**Captain not working:**
-- Verify `isCaptain` is set to `true` in database
-- Check that the slot has a player assigned
+- [ ] Test user created with proper password hash
+- [ ] Login page works
+- [ ] Protected routes redirect to login
+- [ ] Sign out works
+- [ ] Password reset flow works
+- [ ] Admin access works for admin emails
+- [ ] Non-admin users can't access admin pages
+- [ ] Session persists across tabs

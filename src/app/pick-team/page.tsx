@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentGameweek } from "@/lib/gameweek";
+import { getCurrentUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import type { Position } from "@/types/fantasy";
 import PickTeamClient from "./PickTeamClient";
 import type { PickTeamSlot } from "./types";
@@ -16,8 +18,26 @@ type SubmittedSlot = {
 };
 
 async function getTeamForCurrentUser() {
-  const user = await prisma.user.findFirstOrThrow();
-  const league = await prisma.league.findFirstOrThrow({ where: { ownerId: user.id } });
+  const user = await getCurrentUser();
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Find user's first league (or create one if needed)
+  let league = await prisma.league.findFirst({ where: { ownerId: user.id } });
+  if (!league) {
+    // If user has no owned league, find any league they're a member of
+    const membership = await prisma.leagueMember.findFirst({
+      where: { userId: user.id },
+      include: { league: true },
+    });
+    if (membership) {
+      league = membership.league;
+    } else {
+      throw new Error("User has no league");
+    }
+  }
+
   const team = await prisma.team.findFirst({
     where: { userId: user.id, leagueId: league.id },
   });
