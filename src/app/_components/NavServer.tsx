@@ -3,6 +3,8 @@ import { getCurrentUser } from "@/lib/auth";
 import SignOutButton from "./SignOutButton";
 import NavClient from "./NavClient";
 
+export const dynamic = 'force-dynamic';
+
 const links = [
   { href: "/", label: "Home" },
   { href: "/pick-team", label: "Pick Team" },
