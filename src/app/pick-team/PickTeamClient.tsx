@@ -58,8 +58,14 @@ export default function PickTeamClient({
     startCaptainTransition(async () => {
       try {
         setCaptainError("");
-        await setCaptainAction(slotId);
-        router.refresh();
+        const result = await setCaptainAction(slotId);
+        if (result.ok) {
+          // Refresh to show updated captain status
+          router.refresh();
+        } else {
+          setCaptainError(result.message || "Failed to set captain");
+          setTimeout(() => setCaptainError(""), 3000);
+        }
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Failed to set captain";

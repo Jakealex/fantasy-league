@@ -244,9 +244,19 @@ export async function confirmTransfersAction(
     return { ok: false, message: "Transfers are closed." };
   }
 
-  const team = await getTeamForCurrentUser();
+  let team;
+  try {
+    team = await getTeamForCurrentUser();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not find your team.";
+    console.error("[confirmTransfers] getTeamForCurrentUser error:", error);
+    return { ok: false, message };
+  }
 
   try {
+    console.log("[confirmTransfers] Starting transaction for team:", team.id);
+    console.log("[confirmTransfers] Submitting slots:", submitted);
+    
     await prisma.$transaction([
       ...REQUIRED_SLOT_LABELS.map((slotLabel) => {
         const slot = submitted.find((s) => s.slotLabel === slotLabel);
@@ -264,7 +274,7 @@ export async function confirmTransfersAction(
     ]);
 
     console.log(
-      "[confirmTransfers] updated slots",
+      "[confirmTransfers] Transaction successful - updated slots",
       REQUIRED_SLOT_LABELS.length,
       "teamId",
       team.id
@@ -276,9 +286,10 @@ export async function confirmTransfersAction(
     // Return success - let client handle navigation after transaction completes
     return { ok: true, message: "Transfers confirmed." };
   } catch (error) {
+    console.error("[confirmTransfers] Transaction error:", error);
     const message =
       error instanceof Error ? error.message : "Could not confirm transfers.";
-    return { ok: false, message };
+    return { ok: false, message: `Database error: ${message}` };
   }
 
   return { ok: true, message: "Transfers confirmed." };
