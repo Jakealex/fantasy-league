@@ -16,12 +16,20 @@ const links = [
 
 export default async function Nav() {
   noStore(); // Prevent any caching
-  console.log('[Nav] Component executing at:', new Date().toISOString());
+  
+  // Force execution - log immediately
+  const timestamp = new Date().toISOString();
+  console.error('[NAV-DEBUG] Component executing at:', timestamp);
+  console.log('[NAV-DEBUG] Component executing at:', timestamp);
+  
   const user = await getCurrentUser();
   
-  // Debug logging for Vercel logs
-  console.log('[Nav] User:', user ? { id: user.id, email: user.email, firstName: user.firstName } : 'null');
-  console.log('[Nav] Will render:', user ? 'LOGGED IN' : 'LOGGED OUT');
+  // Debug logging for Vercel logs - use both console.log and console.error
+  const userInfo = user ? { id: user.id, email: user.email, firstName: user.firstName } : 'null';
+  console.error('[NAV-DEBUG] User:', userInfo);
+  console.log('[NAV-DEBUG] User:', userInfo);
+  console.error('[NAV-DEBUG] Will render:', user ? 'LOGGED IN' : 'LOGGED OUT');
+  console.log('[NAV-DEBUG] Will render:', user ? 'LOGGED IN' : 'LOGGED OUT');
 
   return (
     <nav className="flex gap-6 items-center p-4 border-b">
@@ -29,6 +37,12 @@ export default async function Nav() {
         <NavClient key={l.href} href={l.href} label={l.label} />
       ))}
       <div className="ml-auto flex gap-4 items-center">
+        {/* Debug: Show user state */}
+        {process.env.NODE_ENV === 'development' && (
+          <span className="text-xs text-red-500" title={`User: ${user ? 'EXISTS' : 'NULL'}`}>
+            [DEBUG]
+          </span>
+        )}
         {user ? (
           <>
             <span className="text-sm text-gray-500">
