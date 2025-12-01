@@ -2,7 +2,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentGameweek } from "@/lib/gameweek";
 import type { Player } from "@/types/fantasy";
@@ -265,14 +264,13 @@ export async function confirmTransfersAction(
     revalidatePath("/transfers");
     revalidatePath("/pick-team");
 
-    redirect("/pick-team");
+    // Return success instead of redirecting - let client handle navigation
+    return { ok: true, message: "Transfers confirmed." };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not confirm transfers.";
     return { ok: false, message };
   }
-
-  return { ok: true, message: "Transfers confirmed." };
 }
 
 // Optional one-arg wrappers if your client imports these:

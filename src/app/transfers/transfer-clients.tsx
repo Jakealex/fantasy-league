@@ -8,6 +8,7 @@ import {
   type ReactNode,
   type ReactElement,
 } from "react";
+import { useRouter } from "next/navigation";
 import type { Player, SquadSlot } from "@/types/fantasy";
 import { confirmTransfersDirect } from "./actions";
 
@@ -90,6 +91,7 @@ export default function TransfersClient({
   transfersOpen: boolean;
   currentGameweek: CurrentGameweek;
 }) {
+  const router = useRouter();
   const [isSaving, startSaving] = useTransition();
 
   // Check if deadline has passed
@@ -246,13 +248,15 @@ export default function TransfersClient({
     startSaving(async () => {
       try {
         const result = await confirmTransfersDirect(formData);
-        if (!result.ok) {
+        if (result.ok) {
+          // Navigate to pick-team page after successful transfer
+          router.push("/pick-team");
+        } else {
           setConfirmMessage(result.message || "Could not confirm transfers.");
         }
       } catch (error) {
-        if (!isRedirectError(error)) {
-          setConfirmMessage(getErrorMessage(error));
-        }
+        // No longer need to check for redirect errors since we're not using redirect()
+        setConfirmMessage(getErrorMessage(error));
       }
     });
   }
