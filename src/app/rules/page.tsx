@@ -182,15 +182,6 @@ export default function RulesPage() {
           <li>Pick Team changes</li>
         </ul>
 
-        <p className="text-gray-700 mb-2">
-          Lock triggers when either:
-        </p>
-        <ul className="list-disc list-inside space-y-1 text-gray-700 ml-4">
-          <li><code className="bg-gray-100 px-1 rounded">deadlineAt</code> &lt; now</li>
-          <li>OR <code className="bg-gray-100 px-1 rounded">isFinished == true</code></li>
-          <li>OR global setting <code className="bg-gray-100 px-1 rounded">transfersOpen == false</code></li>
-        </ul>
-
         <p className="text-gray-600 text-sm mt-4">
           This ensures fairness across players.
         </p>
