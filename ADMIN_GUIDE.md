@@ -103,7 +103,37 @@ For each player, you can enter:
 
 ---
 
-### 3. Transfer Settings
+### 3. Player Management
+**URL:** `/admin/players`
+
+**Purpose:** View and edit player prices in the database.
+
+**Actions Available:**
+
+#### Edit Player Price
+- Click **"Edit Price"** next to any player
+- Enter the new price (must be between 0 and 100)
+- Click **"Save"** to update
+- Changes take effect immediately
+
+#### Search and Filter
+- Use the search box to find players by name or team
+- Use the team filter dropdown to show only specific teams
+- Table shows: Name, Team, Position, Status, and Current Price
+
+**When to Use:**
+- Adjust player prices based on performance
+- Correct pricing errors
+- Update prices for new players
+
+**Note:** 
+- Price changes affect all users immediately
+- Users who already have the player in their squad keep them at the old price until they transfer
+- Budget calculations use the current price when making transfers
+
+---
+
+### 4. Transfer Settings
 **URL:** `/admin/transfers`
 
 **Purpose:** Globally control whether transfers are allowed across the entire system.
