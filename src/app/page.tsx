@@ -153,7 +153,7 @@ export default async function HomePage() {
     orderBy: { number: "asc" },
   });
 
-  const finishedIds = finishedGws.map((gw) => gw.id);
+  const finishedIds = finishedGws.map((gw: { id: number }) => gw.id);
 
   const scores =
     finishedIds.length > 0
