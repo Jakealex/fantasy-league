@@ -4,6 +4,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentGameweek } from "@/lib/gameweek";
+import { getCurrentUser } from "@/lib/auth";
 import type { Player } from "@/types/fantasy";
 
 export type ActionState = { ok: boolean; message: string };
@@ -20,13 +21,21 @@ type SubmittedSlot = {
 
 // --- helpers (not exported) ---
 async function getTeamForCurrentUser() {
-  // TODO: swap to real auth (session userId). For now use first user/league.
-  const user = await prisma.user.findFirstOrThrow();
-  const league = await prisma.league.findFirstOrThrow({ where: { ownerId: user.id } });
-  const team = await prisma.team.findFirstOrThrow({
-    where: { userId: user.id, leagueId: league.id },
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+  
+  // Find user's team - check all leagues they're a member of
+  const userTeam = await prisma.team.findFirst({
+    where: { userId: user.id },
   });
-  return team;
+  
+  if (!userTeam) {
+    throw new Error("User has no team");
+  }
+  
+  return userTeam;
 }
 
 function slotPrefixForPosition(pos: Player["position"]): "GK" | "OUT" {
@@ -264,13 +273,15 @@ export async function confirmTransfersAction(
     revalidatePath("/transfers");
     revalidatePath("/pick-team");
 
-    // Return success instead of redirecting - let client handle navigation
+    // Return success - let client handle navigation after transaction completes
     return { ok: true, message: "Transfers confirmed." };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not confirm transfers.";
     return { ok: false, message };
   }
+
+  return { ok: true, message: "Transfers confirmed." };
 }
 
 // Optional one-arg wrappers if your client imports these:
