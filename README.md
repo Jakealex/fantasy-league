@@ -2,21 +2,84 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+- **Node.js** (v18 or higher recommended)
+- **PostgreSQL database** (local or remote)
+- **npm** or **yarn** or **pnpm**
+
+### Setup Steps
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd web
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables:**
+   Create a `.env` file in the root directory with:
+   ```env
+   DATABASE_URL="postgresql://user:password@localhost:5432/database_name"
+   ADMIN_EMAILS="jakeshapiro007@gmail.com,jboner2111@gmail.com"
+   ```
+   - Replace with your actual database connection string
+   - `ADMIN_EMAILS` is optional (has defaults)
+
+4. **Set up the database:**
+   ```bash
+   # Generate Prisma Client
+   npx prisma generate
+   
+   # Run migrations to create tables
+   npx prisma migrate dev
+   
+   # Seed the database with initial data
+   npm run db:seed
+   ```
+
+5. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+
+6. **Open your browser:**
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+### Database Management
+
+**View/Edit Database (Prisma Studio):**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run studio
+```
+This opens a visual database browser at `http://localhost:5555` where you can view and edit all database records.
+
+**Run migrations:**
+```bash
+npm run migrate
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Seed database:**
+```bash
+npm run db:seed
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Common Issues
+
+**"Can't connect to database":**
+- Check your `.env` file has the correct `DATABASE_URL`
+- Ensure PostgreSQL is running
+- Verify database credentials
+
+**"Prisma Client not generated":**
+- Run `npx prisma generate`
+
+**"Module not found":**
+- Run `npm install` to install dependencies
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

@@ -6,19 +6,26 @@ import { signOutAction } from "./actions";
 export default function SignOutButton() {
   const [isPending, startTransition] = useTransition();
 
-  function handleSubmit(e: React.FormEvent) {
+  const handleSignOut = async (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
-      await signOutAction();
+      try {
+        await signOutAction();
+      } catch (error) {
+        console.error("Sign out error:", error);
+        // Still redirect even if there's an error
+        window.location.href = "/login";
+      }
     });
-  }
+  };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSignOut}>
       <button
         type="submit"
         disabled={isPending}
-        className="text-gray-600 hover:text-black disabled:opacity-50"
+        aria-label="Sign out"
+        className="text-gray-600 hover:text-black disabled:opacity-50 transition-colors"
       >
         {isPending ? "Signing out..." : "Sign Out"}
       </button>
