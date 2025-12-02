@@ -1,5 +1,17 @@
 # Fixing Prisma Studio `STUDIO_EMBED_BUILD` Error
 
+## 🚨 **IMPORTANT: DATABASE_URL Configuration**
+
+**Prisma Studio REQUIRES a standard Postgres URL** - it cannot use accelerated Prisma URLs (`prisma+postgres://`).
+
+If you're getting connection errors in Prisma Studio:
+1. Check your `.env` file has `DATABASE_URL` set to a **standard Postgres URL**
+2. Format: `postgresql://user:password@host:port/database?sslmode=require&schema=public`
+3. **DO NOT** use accelerated URLs (`prisma+postgres://`) in `.env` for local development
+4. See `DATABASE_URL_SETUP.md` for complete setup instructions
+
+---
+
 ## ✅ **Current Status**
 
 Your Prisma installation is **correctly configured**:

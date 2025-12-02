@@ -24,11 +24,14 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 3. **Set up environment variables:**
    Create a `.env` file in the root directory with:
    ```env
-   DATABASE_URL="postgresql://user:password@localhost:5432/database_name"
+   DATABASE_URL="postgresql://user:password@host:5432/database?sslmode=require&schema=public"
    ADMIN_EMAILS="jakeshapiro007@gmail.com,jboner2111@gmail.com"
    ```
-   - Replace with your actual database connection string
+   - **IMPORTANT**: Use a **standard Postgres URL** (starts with `postgresql://` or `postgres://`)
+   - **DO NOT** use accelerated Prisma URLs (`prisma+postgres://`) in `.env` - they won't work with Prisma Studio
+   - Get the standard URL from your Prisma Postgres dashboard
    - `ADMIN_EMAILS` is optional (has defaults)
+   - See `DATABASE_URL_SETUP.md` for detailed configuration guide
 
 4. **Set up the database:**
    ```bash
@@ -71,9 +74,10 @@ npm run db:seed
 ### Common Issues
 
 **"Can't connect to database":**
-- Check your `.env` file has the correct `DATABASE_URL`
+- Check your `.env` file has the correct `DATABASE_URL` (must be standard Postgres URL, not accelerated)
 - Ensure PostgreSQL is running
 - Verify database credentials
+- **Prisma Studio errors**: Ensure `DATABASE_URL` is a standard Postgres URL (`postgresql://...`), NOT an accelerated URL (`prisma+postgres://`)
 
 **"Prisma Client not generated":**
 - Run `npx prisma generate`
