@@ -1,0 +1,41 @@
+[33mcommit b496b13582ab3de0afab3ffe638b3d202b7b106e[m
+Author: Jakealex <jakeshapiro007@gmail.com>
+Date:   Tue Dec 2 14:29:34 2025 +0200
+
+    Implement fixtures, score events, and scoring engine
+    
+    - Fix Prisma Studio connection: Use standard Postgres URL (port 5432)
+    - Update Prisma schema: Add EventType enum, fixture score fields, ScoreEvent minute field
+    - Add migration: Convert ScoreEvent.type to enum, add fixture scoring fields
+    - Create fixtures helper utilities: getFixturesWithRelations, getPlayersForFixture, etc.
+    - Implement scoring engine: calculatePlayerPoints() with confirmed rules
+      - GOAL: +5, ASSIST: +3, OWN_GOAL: -2
+      - YELLOW_CARD: -1, RED_CARD: -3
+      - GK: 7 - goalsConceded (can be negative)
+      - Outfield clean sheet: +1 if goalsConceded == 0
+    - Add server actions: fixtures CRUD, score events CRUD, runGameweekScoring
+    - Build admin UI: fixtures list, fixture detail, events management pages
+    - Update gameweek scoring action to use new calculatePlayerPoints function
+    - Add documentation: DATABASE_URL_SETUP.md, connection troubleshooting guides
+
+CONNECTION_STRING_FIX.md
+DATABASE_URL_SETUP.md
+PRISMA_STUDIO_FIX.md
+README.md
+SOLUTION_SUMMARY.md
+TEST_CONNECTION.md
+package.json
+prisma/migrations/20251201000000_add_fixture_scoring_fields/migration.sql
+prisma/schema.prisma
+src/app/admin/fixtures/FixturesAdminClient.tsx
+src/app/admin/fixtures/[id]/FixtureDetailClient.tsx
+src/app/admin/fixtures/[id]/actions.ts
+src/app/admin/fixtures/[id]/events/FixtureEventsClient.tsx
+src/app/admin/fixtures/[id]/events/page.tsx
+src/app/admin/fixtures/[id]/page.tsx
+src/app/admin/fixtures/actions.ts
+src/app/admin/fixtures/page.tsx
+src/app/admin/gameweeks/[id]/actions.ts
+src/lib/fixtures.ts
+src/lib/prisma.ts
+src/lib/scoring.ts

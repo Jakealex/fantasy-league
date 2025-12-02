@@ -7,16 +7,18 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
-    "studio": "prisma studio",
+    "studio": "npm run prisma:clean && npx prisma studio",
     "migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
+    "db:reset": "ts-node prisma/reset-to-production.ts",
+    "prisma:clean": "ts-node scripts/cleanPrismaCache.ts",
     "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.17.0",
+    "@prisma/client": "^6.19.0",
     "bcryptjs": "^3.0.3",
     "next": "15.5.4",
     "react": "19.1.0",
@@ -31,7 +33,7 @@
     "@types/react-dom": "^18.3.7",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
-    "prisma": "6.17.0",
+    "prisma": "^6.17.0",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "^5"
