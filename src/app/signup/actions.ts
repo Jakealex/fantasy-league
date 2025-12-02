@@ -55,16 +55,19 @@ export async function signupAction(form: {
   let overall = await prisma.league.findFirst({ where: { type: "OVERALL" } });
   if (!overall) {
     try {
-      overall = await prisma.league.upsert({
+      overall = await prisma.league.findFirst({
         where: { name: "Overall League" },
-        update: {},
-        create: {
-          name: "Overall League",
-          type: "OVERALL",
-          inviteCode: null,
-          ownerId: null,
-        },
       });
+      if (!overall) {
+        overall = await prisma.league.create({
+          data: {
+            name: "Overall League",
+            type: "OVERALL",
+            inviteCode: null,
+            ownerId: null,
+          },
+        });
+      }
     } catch (error) {
       // If upsert fails, try to find it again (another process might have created it)
       overall = await prisma.league.findFirst({ where: { type: "OVERALL" } });
@@ -78,17 +81,20 @@ export async function signupAction(form: {
   let tribe = await prisma.league.findFirst({ where: { type: "TRIBE", shevet } });
   if (!tribe) {
     try {
-      tribe = await prisma.league.upsert({
+      tribe = await prisma.league.findFirst({
         where: { name: shevet },
-        update: {},
-        create: {
-          name: shevet,
-          type: "TRIBE",
-          shevet: shevet,
-          inviteCode: null,
-          ownerId: null,
-        },
       });
+      if (!tribe) {
+        tribe = await prisma.league.create({
+          data: {
+            name: shevet,
+            type: "TRIBE",
+            shevet: shevet,
+            inviteCode: null,
+            ownerId: null,
+          },
+        });
+      }
     } catch (error) {
       // If upsert fails, try to find it again
       tribe = await prisma.league.findFirst({ where: { type: "TRIBE", shevet } });
@@ -103,17 +109,20 @@ export async function signupAction(form: {
   if (!roleLeague) {
     const roleLeagueName = role === "Maddie" ? "Maddies League" : "Channies League";
     try {
-      roleLeague = await prisma.league.upsert({
+      roleLeague = await prisma.league.findFirst({
         where: { name: roleLeagueName },
-        update: {},
-        create: {
-          name: roleLeagueName,
-          type: "ROLE",
-          role: role,
-          inviteCode: null,
-          ownerId: null,
-        },
       });
+      if (!roleLeague) {
+        roleLeague = await prisma.league.create({
+          data: {
+            name: roleLeagueName,
+            type: "ROLE",
+            role: role,
+            inviteCode: null,
+            ownerId: null,
+          },
+        });
+      }
     } catch (error) {
       // If upsert fails, try to find it again
       roleLeague = await prisma.league.findFirst({ where: { type: "ROLE", role } });

@@ -48,7 +48,6 @@ export async function addScoreEventAction(
     const fixtureId = String(formData.get("fixtureId") ?? "");
     const playerId = String(formData.get("playerId") ?? "");
     const eventType = String(formData.get("eventType") ?? "");
-    const minuteStr = String(formData.get("minute") ?? "");
 
     if (!fixtureId || !playerId || !eventType) {
       return { ok: false, message: "Fixture, player, and event type are required" };
@@ -81,18 +80,11 @@ export async function addScoreEventAction(
       return { ok: false, message: "Player is not from either team in this fixture" };
     }
 
-    // Parse minute (optional)
-    const minute = minuteStr ? Number(minuteStr) : null;
-    if (minute !== null && (isNaN(minute) || minute < 0 || minute > 120)) {
-      return { ok: false, message: "Minute must be between 0 and 120" };
-    }
-
     await prisma.scoreEvent.create({
       data: {
         fixtureId,
         playerId,
         type: eventType as "GOAL" | "ASSIST" | "YC" | "RC" | "OG",
-        minute,
       },
     });
 
@@ -156,10 +148,9 @@ export async function getFixtureEventsAction(fixtureId: string) {
     include: {
       player: true,
     },
-    orderBy: [
-      { minute: "asc" },
-      { id: "asc" },
-    ],
+    orderBy: {
+      id: "asc",
+    },
   });
 }
 

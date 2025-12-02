@@ -125,7 +125,6 @@ model ScoreEvent {
   fixtureId String
   playerId  String
   type      EventType
-  minute    Int?
   fixture   Fixture    @relation(fields: [fixtureId], references: [id])
   player    Player     @relation(fields: [playerId], references: [id])
 }

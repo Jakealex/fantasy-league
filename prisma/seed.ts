@@ -15,57 +15,70 @@ function randomCode(len = 8) {
 
 async function main() {
   // 0) Create system leagues (10 leagues total)
-  const overallLeague = await prisma.league.upsert({
+  let overallLeague = await prisma.league.findFirst({
     where: { name: "Overall League" },
-    update: {},
-    create: {
-      name: "Overall League",
-      type: "OVERALL",
-      inviteCode: null,
-      ownerId: null,
-    },
   });
+  if (!overallLeague) {
+    overallLeague = await prisma.league.create({
+      data: {
+        name: "Overall League",
+        type: "OVERALL",
+        inviteCode: null,
+        ownerId: null,
+      },
+    });
+  }
 
   const shevatim = ["Ktan tanim", "Gurim", "Roim", "Moledet", "Chaim", "Reim", "Kaveh"];
   const tribeLeagues = await Promise.all(
-    shevatim.map((shevet) =>
-      prisma.league.upsert({
+    shevatim.map(async (shevet) => {
+      let league = await prisma.league.findFirst({
         where: { name: shevet },
-        update: {},
-        create: {
-          name: shevet,
-          type: "TRIBE",
-          shevet: shevet,
-          inviteCode: null,
-          ownerId: null,
-        },
-      })
-    )
+      });
+      if (!league) {
+        league = await prisma.league.create({
+          data: {
+            name: shevet,
+            type: "TRIBE",
+            shevet: shevet,
+            inviteCode: null,
+            ownerId: null,
+          },
+        });
+      }
+      return league;
+    })
   );
 
-  const maddiesLeague = await prisma.league.upsert({
+  let maddiesLeague = await prisma.league.findFirst({
     where: { name: "Maddies League" },
-    update: {},
-    create: {
-      name: "Maddies League",
-      type: "ROLE",
-      role: "Maddie",
-      inviteCode: null,
-      ownerId: null,
-    },
   });
+  if (!maddiesLeague) {
+    maddiesLeague = await prisma.league.create({
+      data: {
+        name: "Maddies League",
+        type: "ROLE",
+        role: "Maddie",
+        inviteCode: null,
+        ownerId: null,
+      },
+    });
+  }
 
-  const channiesLeague = await prisma.league.upsert({
+  let channiesLeague = await prisma.league.findFirst({
     where: { name: "Channies League" },
-    update: {},
-    create: {
-      name: "Channies League",
-      type: "ROLE",
-      role: "Channie",
-      inviteCode: null,
-      ownerId: null,
-    },
   });
+  if (!channiesLeague) {
+    channiesLeague = await prisma.league.create({
+      data: {
+        name: "Channies League",
+        type: "ROLE",
+        role: "Channie",
+        inviteCode: null,
+        ownerId: null,
+      },
+    });
+  }
 
   // 1) User
   // Generate real password hash for 'password123'
@@ -199,8 +212,7 @@ async function main() {
       id: 'demo-event-1',
       fixtureId: fixture.id,
       playerId: out.id,
-      type: 'goal' as EventType,
-      value: 5,
+      type: 'GOAL',
     },
   });
 

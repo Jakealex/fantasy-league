@@ -2,8 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { addScoreEventAction, deleteScoreEventAction } from "../../actions";
-import type { ActionState } from "../../actions";
+import { addScoreEventAction, deleteScoreEventAction } from "../actions";
 
 type Player = {
   id: string;
@@ -15,7 +14,6 @@ type Player = {
 type ScoreEvent = {
   id: string;
   type: string;
-  minute: number | null;
   player: {
     id: string;
     name: string;
@@ -43,9 +41,6 @@ export default function FixtureEventsClient({
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
 
-  const allPlayers = [...homePlayers, ...awayPlayers].sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
 
   const eventTypes = [
     { value: "GOAL", label: "Goal" },
@@ -183,19 +178,6 @@ export default function FixtureEventsClient({
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Minute (optional)
-                </label>
-                <input
-                  type="number"
-                  name="minute"
-                  min="0"
-                  max="120"
-                  placeholder="e.g. 45"
-                  className="w-full rounded border px-3 py-2"
-                />
-              </div>
             </div>
             <button
               type="submit"
@@ -223,11 +205,6 @@ export default function FixtureEventsClient({
                   <span className="text-gray-600">
                     - {eventTypeLabels[event.type] || event.type}
                   </span>
-                  {event.minute !== null && (
-                    <span className="text-gray-500 text-sm">
-                      ({event.minute}')
-                    </span>
-                  )}
                 </div>
                 <button
                   onClick={() => handleDeleteEvent(event.id)}

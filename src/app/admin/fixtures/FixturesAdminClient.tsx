@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { createFixtureAction } from "./actions";
-import type { ActionState } from "./actions";
 
 type Gameweek = {
   id: number;
@@ -14,7 +13,6 @@ type Gameweek = {
 type ScoreEvent = {
   id: string;
   type: string;
-  minute: number | null;
   player: {
     id: string;
     name: string;

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/admin";
 import { validateFixtureData } from "@/lib/fixtures";
 import { getFixturesWithRelations } from "@/lib/fixtures";
+import type { Prisma } from "@prisma/client";
 
 export type ActionState = {
   ok: boolean;
@@ -98,12 +99,14 @@ export async function updateFixtureScoreAction(
       return { ok: false, message: "Away goals cannot be negative" };
     }
 
+    const updateData: Prisma.FixtureUpdateInput = {
+      homeGoals: homeGoals ?? null,
+      awayGoals: awayGoals ?? null,
+    };
+
     await prisma.fixture.update({
       where: { id: fixtureId },
-      data: {
-        homeGoals: homeGoals ?? null,
-        awayGoals: awayGoals ?? null,
-      },
+      data: updateData,
     });
 
     revalidatePath(`/admin/fixtures/${fixtureId}`);

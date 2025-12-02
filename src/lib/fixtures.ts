@@ -13,7 +13,7 @@ export async function getFixturesWithRelations(gameweekId?: number) {
           player: true,
         },
         orderBy: {
-          minute: "asc",
+          id: "asc",
         },
       },
     },
@@ -36,7 +36,7 @@ export async function getFixtureWithRelations(fixtureId: string) {
           player: true,
         },
         orderBy: {
-          minute: "asc",
+          id: "asc",
         },
       },
     },

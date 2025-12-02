@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { updateFixtureScoreAction } from "../actions";
 import { runGameweekScoringAction } from "@/app/admin/gameweeks/[id]/actions";
-import type { ActionState } from "../actions";
 
 type Gameweek = {
   id: number;
@@ -23,7 +22,6 @@ type Player = {
 type ScoreEvent = {
   id: string;
   type: string;
-  minute: number | null;
   player: {
     id: string;
     name: string;
@@ -43,8 +41,6 @@ type Fixture = {
 
 export default function FixtureDetailClient({
   fixture,
-  homePlayers,
-  awayPlayers,
   gameweek,
 }: {
   fixture: Fixture;
@@ -253,9 +249,6 @@ export default function FixtureDetailClient({
                   <span className="text-gray-600 ml-2">
                     - {eventTypeLabels[event.type] || event.type}
                   </span>
-                  {event.minute !== null && (
-                    <span className="text-gray-500 ml-2">({event.minute}')</span>
-                  )}
                 </div>
               </div>
             ))}
