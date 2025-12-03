@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updatePlayerPriceAction, createPlayerAction } from "./actions";
+import { updatePlayerPriceAction, createPlayerAction, updatePlayerAction } from "./actions";
 import { useRouter } from "next/navigation";
 
 type Player = {
@@ -21,7 +21,10 @@ export default function PlayersAdminClient({
   const router = useRouter();
   const [players, setPlayers] = useState(initialPlayers);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingField, setEditingField] = useState<"price" | "name" | "team" | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
+  const [editName, setEditName] = useState<string>("");
+  const [editTeam, setEditTeam] = useState<string>("");
   const [isPending, startTransition] = useTransition();
   const [isCreating, startCreateTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
@@ -51,15 +54,25 @@ export default function PlayersAdminClient({
     return matchesSearch && matchesTeam;
   });
 
-  const handleEditClick = (player: Player) => {
+  const handleEditClick = (player: Player, field: "price" | "name" | "team") => {
     setEditingId(player.id);
-    setEditPrice(player.price);
+    setEditingField(field);
+    if (field === "price") {
+      setEditPrice(player.price);
+    } else if (field === "name") {
+      setEditName(player.name);
+    } else if (field === "team") {
+      setEditTeam(player.teamName);
+    }
     setMessage(null);
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
+    setEditingField(null);
     setEditPrice(0);
+    setEditName("");
+    setEditTeam("");
     setMessage(null);
   };
 
@@ -73,10 +86,35 @@ export default function PlayersAdminClient({
             prev.map((p) => (p.id === playerId ? { ...p, price: editPrice } : p))
           );
           setEditingId(null);
+          setEditingField(null);
           setMessage("Price updated successfully!");
           setTimeout(() => setMessage(null), 3000);
         } else {
           setMessage(result.message || "Failed to update price");
+          setTimeout(() => setMessage(null), 3000);
+        }
+      } catch (error) {
+        setMessage("An error occurred");
+        setTimeout(() => setMessage(null), 3000);
+      }
+    });
+  };
+
+  const handleSaveNameAndTeam = (playerId: string) => {
+    startTransition(async () => {
+      try {
+        const result = await updatePlayerAction(playerId, editName, editTeam);
+        if (result.ok) {
+          // Update local state
+          setPlayers((prev) =>
+            prev.map((p) => (p.id === playerId ? { ...p, name: editName, teamName: editTeam } : p))
+          );
+          setEditingId(null);
+          setEditingField(null);
+          setMessage("Player updated successfully!");
+          setTimeout(() => setMessage(null), 3000);
+        } else {
+          setMessage(result.message || "Failed to update player");
           setTimeout(() => setMessage(null), 3000);
         }
       } catch (error) {
@@ -283,12 +321,36 @@ export default function PlayersAdminClient({
             ) : (
               filteredPlayers.map((player) => (
                 <tr key={player.id} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium">{player.name}</td>
-                  <td className="px-4 py-2">{player.teamName}</td>
+                  <td className="px-4 py-2">
+                    {editingId === player.id && editingField === "name" ? (
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        disabled={isPending}
+                      />
+                    ) : (
+                      <span className="font-medium">{player.name}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    {editingId === player.id && editingField === "team" ? (
+                      <input
+                        type="text"
+                        value={editTeam}
+                        onChange={(e) => setEditTeam(e.target.value)}
+                        className="w-full border rounded px-2 py-1 text-sm"
+                        disabled={isPending}
+                      />
+                    ) : (
+                      <span>{player.teamName}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-2">{player.position}</td>
                   <td className="px-4 py-2">{player.status}</td>
                   <td className="px-4 py-2">
-                    {editingId === player.id ? (
+                    {editingId === player.id && editingField === "price" ? (
                       <input
                         type="number"
                         step="0.1"
@@ -309,7 +371,13 @@ export default function PlayersAdminClient({
                     {editingId === player.id ? (
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleSavePrice(player.id)}
+                          onClick={() => {
+                            if (editingField === "price") {
+                              handleSavePrice(player.id);
+                            } else if (editingField === "name" || editingField === "team") {
+                              handleSaveNameAndTeam(player.id);
+                            }
+                          }}
                           disabled={isPending}
                           className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:opacity-50"
                         >
@@ -324,12 +392,29 @@ export default function PlayersAdminClient({
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => handleEditClick(player)}
-                        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                      >
-                        Edit Price
-                      </button>
+                      <div className="flex gap-1 flex-wrap">
+                        <button
+                          onClick={() => handleEditClick(player, "name")}
+                          className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                          title="Edit name"
+                        >
+                          Edit Name
+                        </button>
+                        <button
+                          onClick={() => handleEditClick(player, "team")}
+                          className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                          title="Edit team"
+                        >
+                          Edit Team
+                        </button>
+                        <button
+                          onClick={() => handleEditClick(player, "price")}
+                          className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                          title="Edit price"
+                        >
+                          Edit Price
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>

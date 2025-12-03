@@ -132,12 +132,11 @@ export default function FixturesAdminClient({
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Kickoff Date & Time *
+                  Kickoff Date & Time (Optional)
                 </label>
                 <input
                   type="datetime-local"
                   name="kickoffAt"
-                  required
                   className="w-full rounded border px-3 py-2"
                 />
               </div>
@@ -221,7 +220,7 @@ export default function FixturesAdminClient({
                                 )}
                             </div>
                             <div className="text-sm text-gray-600 mt-1">
-                              {formatDate(fixture.kickoffAt)}
+                              {fixture.kickoffAt && formatDate(fixture.kickoffAt)}
                               {fixture.events.length > 0 && (
                                 <span className="ml-2">
                                   • {fixture.events.length} event

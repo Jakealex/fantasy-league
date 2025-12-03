@@ -119,3 +119,59 @@ export async function createPlayerAction(
   }
 }
 
+export async function updatePlayerAction(
+  playerId: string,
+  name: string,
+  teamName: string
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    // Check admin access
+    if (!(await isAdmin())) {
+      return { ok: false, message: "Unauthorized" };
+    }
+
+    // Validate inputs
+    if (!name || name.trim().length === 0) {
+      return { ok: false, message: "Player name is required" };
+    }
+
+    if (!teamName || teamName.trim().length === 0) {
+      return { ok: false, message: "Team name is required" };
+    }
+
+    // Update player
+    await prisma.player.update({
+      where: { id: playerId },
+      data: {
+        name: name.trim(),
+        teamName: teamName.trim(),
+      },
+    });
+
+    // Revalidate paths
+    revalidatePath("/admin/players");
+    revalidatePath("/transfers");
+    revalidatePath("/pick-team");
+    revalidatePath("/players");
+
+    return { ok: true, message: "Player updated successfully" };
+  } catch (error) {
+    console.error("[updatePlayerAction] Error:", error);
+
+    // Handle Prisma unique constraint violation
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return {
+        ok: false,
+        message: "A player with this name and team already exists",
+      };
+    }
+
+    const message =
+      error instanceof Error ? error.message : "Failed to update player";
+    return { ok: false, message };
+  }
+}
+

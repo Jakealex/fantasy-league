@@ -27,15 +27,10 @@ export async function createFixtureAction(
     const homeTeam = String(formData.get("homeTeam") ?? "").trim();
     const awayTeam = String(formData.get("awayTeam") ?? "").trim();
     const gameweekId = Number(formData.get("gameweekId"));
-    const kickoffAtStr = String(formData.get("kickoffAt") ?? "");
+    const kickoffAtStr = String(formData.get("kickoffAt") ?? "").trim();
 
-    if (!homeTeam || !awayTeam || !gameweekId || !kickoffAtStr) {
-      return { ok: false, message: "All fields are required" };
-    }
-
-    const kickoffAt = new Date(kickoffAtStr);
-    if (isNaN(kickoffAt.getTime())) {
-      return { ok: false, message: "Invalid kickoff date" };
+    if (!homeTeam || !awayTeam || !gameweekId) {
+      return { ok: false, message: "Home team, away team, and gameweek are required" };
     }
 
     // Validate gameweek exists
@@ -44,6 +39,18 @@ export async function createFixtureAction(
     });
     if (!gameweek) {
       return { ok: false, message: "Gameweek not found" };
+    }
+
+    // Use kickoffAt if provided, otherwise use gameweek start date
+    let kickoffAt: Date;
+    if (kickoffAtStr) {
+      kickoffAt = new Date(kickoffAtStr);
+      if (isNaN(kickoffAt.getTime())) {
+        return { ok: false, message: "Invalid kickoff date" };
+      }
+    } else {
+      // Default to gameweek start date if not provided
+      kickoffAt = gameweek.startsAt;
     }
 
     // Validate fixture data
