@@ -20,6 +20,7 @@ export default async function AdminPlayersPage() {
   const players = await prisma.player.findMany({
     orderBy: [
       { teamName: "asc" },
+      { position: "asc" },
       { name: "asc" },
     ],
   });

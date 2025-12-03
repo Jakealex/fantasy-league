@@ -1,0 +1,32 @@
+[33mcommit 974a48636742c6b700a8eec42391ba97795c4e05[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Jakealex <jakeshapiro007@gmail.com>
+Date:   Wed Dec 3 10:31:37 2025 +0200
+
+    Refine scoring calculation and points display logic
+    
+    - Simplify scoring.ts calculation logic
+    - Update pick-team page to correctly display gameweek points
+    - Update package dependencies
+
+[1mdiff --git a/src/app/pick-team/page.tsx b/src/app/pick-team/page.tsx[m
+[1mindex c701305..d6fd014 100644[m
+[1m--- a/src/app/pick-team/page.tsx[m
+[1m+++ b/src/app/pick-team/page.tsx[m
+[36m@@ -142,7 +142,7 @@[m [mexport async function saveLineupAction(formData: FormData): Promise<SaveLineupRe[m
+   }[m
+ [m
+   for (const slot of submitted) {[m
+[31m-    const player = players.find((p) => p.id === slot.playerId);[m
+[32m+[m[32m    const player = players.find((p: { id: string }) => p.id === slot.playerId);[m
+     if (!player) continue;[m
+     if (player.position !== expectedPositionForSlot(slot.slotLabel)) {[m
+       return {[m
+[36m@@ -229,7 +229,7 @@[m [mexport default async function Page() {[m
+     },[m
+   });[m
+ [m
+[31m-  const squad: PickTeamSlot[] = slots.map((slot) => {[m
+[32m+[m[32m  const squad: PickTeamSlot[] = slots.map((slot: typeof slots[0]) => {[m
+     // Type assertion needed because Prisma include types don't always include all fields[m
+     const slotWithCaptain = slot as typeof slot & { isCaptain: boolean };[m
+     return {[m

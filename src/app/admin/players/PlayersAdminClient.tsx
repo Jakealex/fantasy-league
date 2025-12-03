@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updatePlayerPriceAction } from "./actions";
+import { updatePlayerPriceAction, createPlayerAction } from "./actions";
+import { useRouter } from "next/navigation";
 
 type Player = {
   id: string;
@@ -17,13 +18,24 @@ export default function PlayersAdminClient({
 }: {
   initialPlayers: Player[];
 }) {
+  const router = useRouter();
   const [players, setPlayers] = useState(initialPlayers);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
   const [isPending, startTransition] = useTransition();
+  const [isCreating, startCreateTransition] = useTransition();
   const [message, setMessage] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTeam, setFilterTeam] = useState<string>("");
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    teamName: "",
+    position: "OUT" as "GK" | "OUT",
+    price: "",
+    status: "A" as "A" | "I",
+  });
 
   // Get unique team names for filter
   const teamNames = Array.from(
@@ -74,12 +86,42 @@ export default function PlayersAdminClient({
     });
   };
 
+  const handleCreatePlayer = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    startCreateTransition(async () => {
+      try {
+        const formDataObj = new FormData(e.currentTarget);
+        const result = await createPlayerAction(formDataObj);
+        if (result.ok) {
+          setMessage("Player created successfully!");
+          // Reset form
+          setFormData({
+            name: "",
+            teamName: "",
+            position: "OUT",
+            price: "",
+            status: "A",
+          });
+          // Refresh the page to get updated player list
+          router.refresh();
+          setTimeout(() => setMessage(null), 3000);
+        } else {
+          setMessage(result.message || "Failed to create player");
+          setTimeout(() => setMessage(null), 3000);
+        }
+      } catch (error) {
+        setMessage("An error occurred");
+        setTimeout(() => setMessage(null), 3000);
+      }
+    });
+  };
+
   return (
     <div className="max-w-6xl mx-auto mt-8 p-4">
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">Manage Players</h1>
         <p className="text-sm text-gray-600">
-          Edit player prices. Changes take effect immediately.
+          Add new players and edit player prices. Changes take effect immediately.
         </p>
       </div>
 
@@ -94,6 +136,106 @@ export default function PlayersAdminClient({
           {message}
         </div>
       )}
+
+      {/* Add Player Form */}
+      <div className="mb-6 border rounded-lg p-4 bg-gray-50">
+        <h2 className="text-lg font-semibold mb-4">Add New Player</h2>
+        <form onSubmit={handleCreatePlayer} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Name *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+              className="w-full border rounded px-3 py-2 text-sm"
+              placeholder="Player name"
+              disabled={isCreating}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Team Name *
+            </label>
+            <input
+              type="text"
+              name="teamName"
+              value={formData.teamName}
+              onChange={(e) => setFormData({ ...formData, teamName: e.target.value })}
+              required
+              className="w-full border rounded px-3 py-2 text-sm"
+              placeholder="Team name"
+              disabled={isCreating}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Position *
+            </label>
+            <select
+              name="position"
+              value={formData.position}
+              onChange={(e) =>
+                setFormData({ ...formData, position: e.target.value as "GK" | "OUT" })
+              }
+              required
+              className="w-full border rounded px-3 py-2 text-sm"
+              disabled={isCreating}
+            >
+              <option value="GK">GK</option>
+              <option value="OUT">OUT</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Price *
+            </label>
+            <input
+              type="number"
+              name="price"
+              value={formData.price}
+              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+              required
+              min="0"
+              max="100"
+              step="0.1"
+              className="w-full border rounded px-3 py-2 text-sm"
+              placeholder="0.0"
+              disabled={isCreating}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Status *
+            </label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={(e) =>
+                setFormData({ ...formData, status: e.target.value as "A" | "I" })
+              }
+              required
+              className="w-full border rounded px-3 py-2 text-sm"
+              disabled={isCreating}
+            >
+              <option value="A">A (Active)</option>
+              <option value="I">I (Injured)</option>
+            </select>
+          </div>
+          <div className="md:col-span-5">
+            <button
+              type="submit"
+              disabled={isCreating}
+              className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreating ? "Creating..." : "Create Player"}
+            </button>
+          </div>
+        </form>
+      </div>
 
       {/* Search and Filter */}
       <div className="mb-4 flex gap-4">
