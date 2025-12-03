@@ -142,7 +142,7 @@ export async function saveLineupAction(formData: FormData): Promise<SaveLineupRe
   }
 
   for (const slot of submitted) {
-    const player = players.find((p) => p.id === slot.playerId);
+    const player = players.find((p: { id: string }) => p.id === slot.playerId);
     if (!player) continue;
     if (player.position !== expectedPositionForSlot(slot.slotLabel)) {
       return {
@@ -229,7 +229,7 @@ export default async function Page() {
     },
   });
 
-  const squad: PickTeamSlot[] = slots.map((slot) => {
+  const squad: PickTeamSlot[] = slots.map((slot: typeof slots[0]) => {
     // Type assertion needed because Prisma include types don't always include all fields
     const slotWithCaptain = slot as typeof slot & { isCaptain: boolean };
     return {

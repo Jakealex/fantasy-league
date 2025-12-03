@@ -20,19 +20,9 @@ export async function calculateGameweekScores(gameweekId: number) {
     where: { gameweekId },
   });
 
-  // map playerId -> stats
-  const statsMap = Object.fromEntries(
-    playerPointsRows.map((pp) => [
-      pp.playerId,
-      {
-        goals: pp.goals ?? 0,
-        assists: pp.assists ?? 0,
-        ownGoals: pp.ownGoals ?? 0,
-        yellowCards: pp.yellowCards ?? 0,
-        redCards: pp.redCards ?? 0,
-        goalsConceded: pp.goalsConceded ?? 0,
-      },
-    ])
+  // map playerId -> points (use the calculated points field directly)
+  const pointsMap = Object.fromEntries(
+    playerPointsRows.map((pp) => [pp.playerId, pp.points ?? 0])
   );
 
   // 4. Process each team
@@ -50,6 +40,7 @@ export async function calculateGameweekScores(gameweekId: number) {
     }
 
     let teamTotal = 0;
+    let captainPoints = 0;
 
     for (const slot of slots) {
       const player = slot.player;
@@ -58,47 +49,22 @@ export async function calculateGameweekScores(gameweekId: number) {
         continue;
       }
 
-      const stats = statsMap[player.id] || {
-        goals: 0,
-        assists: 0,
-        ownGoals: 0,
-        yellowCards: 0,
-        redCards: 0,
-        goalsConceded: 0,
-      };
+      // Get player points from PlayerPoints table (already calculated)
+      const playerPointsRow = playerPointsRows.find((pp) => pp.playerId === player.id);
+      const basePoints = playerPointsRow?.points ?? 0;
 
-      let pts = 0;
+      // Add base points to team total
+      teamTotal += basePoints;
 
-      // Base scoring
-      pts += stats.goals * 5;
-      pts += stats.assists * 3;
-      pts += stats.ownGoals * -2;
-
-      // Cards
-      if (stats.redCards > 0) {
-        pts += -3;
-      } else {
-        pts += stats.yellowCards * -1;
-      }
-
-      // Goalkeeper rule
-      if (player.position === "GK") {
-        pts += 7 - stats.goalsConceded;
-      }
-
-      // Outfield clean sheet rule (goalsConceded == 0)
-      if (player.position === "OUT") {
-        if (stats.goalsConceded === 0) {
-          pts += 1;
-        }
-      }
-
-      // Captain double points
+      // If captain, track for doubling (we'll subtract base and add double)
       if (slot.isCaptain) {
-        pts *= 2;
+        captainPoints = basePoints; // Store captain's base points
       }
+    }
 
-      teamTotal += pts;
+    // Apply captain double: subtract captain's base points, add double
+    if (captainPoints > 0) {
+      teamTotal = teamTotal - captainPoints + (captainPoints * 2);
     }
 
     // Store score in GameweekScore table
