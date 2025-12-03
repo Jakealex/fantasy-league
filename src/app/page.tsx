@@ -38,8 +38,11 @@ function LoggedOutHome() {
         <p className="text-xs text-gray-600 text-center mb-2">
           Made by <strong>Jake Shapiro</strong> if it is working well and made by <strong>Ben Shmukler</strong> if anything breaks.
         </p>
-        <p className="text-xs text-gray-600 text-center">
+        <p className="text-xs text-gray-600 text-center mb-2">
           This is the 1st ever launch expect some bugs in the code and some price mistakes. Just remember have fun and everything will be OK in the end if it is not OK now it is not the end.
+        </p>
+        <p className="text-xs text-gray-600 text-center">
+          The player prices in no way indicate your value as a person, they were arbitrarily assigned by a couple of random people just trying to get this website up and availible for camp. If you have any issues please contact <strong>082 009 8624</strong>.
         </p>
       </div>
     </div>
@@ -140,8 +143,11 @@ function LoggedInHome({
         <p className="text-xs text-gray-600 text-center mb-2">
           Made by <strong>Jake Shapiro</strong> if it is working well and made by <strong>Ben Shmukler</strong> if anything breaks.
         </p>
-        <p className="text-xs text-gray-600 text-center">
+        <p className="text-xs text-gray-600 text-center mb-2">
           This is the 1st ever launch expect some bugs in the code and some price mistakes. Just remember have fun and everything will be OK in the end if it is not OK now it is not the end.
+        </p>
+        <p className="text-xs text-gray-600 text-center">
+          The player prices in no way indicate your value as a person, they were arbitrarily assigned by a couple of random people just trying to get this website up and availible for camp. If you have any issues please contact <strong>082 009 8624</strong>.
         </p>
       </section>
     </div>
