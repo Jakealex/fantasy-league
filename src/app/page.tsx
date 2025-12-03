@@ -32,6 +32,16 @@ function LoggedOutHome() {
           View full rules
         </Link>
       </div>
+
+      {/* Footer Message */}
+      <div className="border rounded-xl p-4 bg-gray-50 border-gray-200 mt-6">
+        <p className="text-xs text-gray-600 text-center mb-2">
+          Made by <strong>Jake Shapiro</strong> if it is working well and made by <strong>Ben Shmukler</strong> if anything breaks.
+        </p>
+        <p className="text-xs text-gray-600 text-center">
+          This is the 1st ever launch expect some bugs in the code and some price mistakes. Just remember have fun and everything will be OK in the end if it is not OK now it is not the end.
+        </p>
+      </div>
     </div>
   );
 }
@@ -123,6 +133,16 @@ function LoggedInHome({
             Check your rank in Overall, Shevet and Maddie/Channie leagues.
           </p>
         </Link>
+      </section>
+
+      {/* Footer Message */}
+      <section className="border rounded-xl p-4 bg-gray-50 border-gray-200 mt-6">
+        <p className="text-xs text-gray-600 text-center mb-2">
+          Made by <strong>Jake Shapiro</strong> if it is working well and made by <strong>Ben Shmukler</strong> if anything breaks.
+        </p>
+        <p className="text-xs text-gray-600 text-center">
+          This is the 1st ever launch expect some bugs in the code and some price mistakes. Just remember have fun and everything will be OK in the end if it is not OK now it is not the end.
+        </p>
       </section>
     </div>
   );

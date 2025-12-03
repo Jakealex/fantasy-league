@@ -37,10 +37,10 @@ export default function RulesPage() {
         </div>
 
         <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-2">Outfield Defensive Bonus</h3>
+          <h3 className="text-lg font-semibold mb-2">Outfield Clean Sheet Bonus</h3>
           <ul className="list-disc list-inside space-y-1 text-gray-700">
-            <li>If team concedes <strong>3 or fewer</strong> → <strong>+1 point</strong></li>
-            <li>If team concedes <strong>4+</strong> → <strong>0 bonus</strong></li>
+            <li><strong>Outfield players only:</strong> If their team keeps a clean sheet (concedes 0 goals) → <strong>+1 point</strong></li>
+            <li>Goalkeepers do not receive this bonus (their points are calculated by the GK formula above)</li>
           </ul>
         </div>
 
