@@ -278,10 +278,10 @@ function LineupCard({
           onClick={() => onSetCaptain(slot.id)}
           disabled={!canSetCaptain}
           className={
-            "w-full rounded border px-3 py-1.5 text-xs font-medium transition-colors " +
+            "w-full rounded border-2 px-3 py-1.5 text-xs font-bold transition-colors " +
             (slot.isCaptain
-              ? "border-yellow-400 bg-yellow-50 text-yellow-800"
-              : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50") +
+              ? "border-yellow-500 bg-yellow-50 text-yellow-800"
+              : "border-gray-600 bg-white text-gray-700 hover:bg-gray-50") +
             (!canSetCaptain
               ? " cursor-not-allowed opacity-50"
               : "")

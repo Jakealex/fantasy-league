@@ -58,6 +58,15 @@ function LoggedInHome({
         <p className="text-sm text-gray-600">Team: {team.name}</p>
       </section>
 
+      {/* Instructional Message */}
+      <section className="border rounded-xl p-4 bg-blue-50 border-blue-200">
+        <h2 className="font-semibold text-blue-900 mb-2">Getting Started</h2>
+        <p className="text-sm text-blue-800">
+          Go to <Link href="/transfers" className="font-semibold underline">Transfers</Link> to create your team, then go to{" "}
+          <Link href="/pick-team" className="font-semibold underline">Pick Team</Link> to set your captain and save your lineup.
+        </p>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-3">
         <div className="border rounded-xl p-3">
           <div className="text-xs uppercase text-gray-500 mb-1">

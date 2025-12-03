@@ -267,7 +267,7 @@ export default async function Page() {
           Review your confirmed squad and save the lineup.
         </p>
         <p className="mt-1 text-sm text-gray-500">
-          Deadline: {new Date(currentGameweek.deadlineAt).toLocaleString()}
+          <span className="font-bold">Deadline:</span> {new Date(currentGameweek.deadlineAt).toLocaleString()}
         </p>
       </header>
 
