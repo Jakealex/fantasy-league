@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updatePlayerPriceAction, createPlayerAction, updatePlayerAction } from "./actions";
+import { updatePlayerPriceAction, createPlayerAction, updatePlayerAction, deletePlayerAction } from "./actions";
 import { useRouter } from "next/navigation";
 
 type Player = {
@@ -27,6 +27,8 @@ export default function PlayersAdminClient({
   const [editTeam, setEditTeam] = useState<string>("");
   const [isPending, startTransition] = useTransition();
   const [isCreating, startCreateTransition] = useTransition();
+  const [isDeleting, startDeleteTransition] = useTransition();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTeam, setFilterTeam] = useState<string>("");
@@ -120,6 +122,35 @@ export default function PlayersAdminClient({
       } catch (error) {
         setMessage("An error occurred");
         setTimeout(() => setMessage(null), 3000);
+      }
+    });
+  };
+
+  const handleDeletePlayer = (playerId: string, playerName: string) => {
+    if (!confirm(`Are you sure you want to delete "${playerName}"? This will also delete all their points, events, and remove them from all squads. This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingId(playerId);
+    startDeleteTransition(async () => {
+      try {
+        const result = await deletePlayerAction(playerId);
+        if (result.ok) {
+          // Remove from local state
+          setPlayers((prev) => prev.filter((p) => p.id !== playerId));
+          setMessage("Player deleted successfully!");
+          setTimeout(() => setMessage(null), 3000);
+          // Refresh to get updated data
+          router.refresh();
+        } else {
+          setMessage(result.message || "Failed to delete player");
+          setTimeout(() => setMessage(null), 3000);
+        }
+      } catch (error) {
+        setMessage("An error occurred");
+        setTimeout(() => setMessage(null), 3000);
+      } finally {
+        setDeletingId(null);
       }
     });
   };
@@ -413,6 +444,14 @@ export default function PlayersAdminClient({
                           title="Edit price"
                         >
                           Edit Price
+                        </button>
+                        <button
+                          onClick={() => handleDeletePlayer(player.id, player.name)}
+                          disabled={isDeleting && deletingId === player.id}
+                          className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50"
+                          title="Delete player"
+                        >
+                          {isDeleting && deletingId === player.id ? "Deleting..." : "Delete"}
                         </button>
                       </div>
                     )}

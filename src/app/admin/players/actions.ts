@@ -175,3 +175,78 @@ export async function updatePlayerAction(
   }
 }
 
+export async function deletePlayerAction(
+  playerId: string
+): Promise<{ ok: boolean; message: string }> {
+  try {
+    // Check admin access
+    if (!(await isAdmin())) {
+      return { ok: false, message: "Unauthorized" };
+    }
+
+    // Check if player exists
+    const player = await prisma.player.findUnique({
+      where: { id: playerId },
+    });
+
+    if (!player) {
+      return { ok: false, message: "Player not found" };
+    }
+
+    // Get affected gameweeks BEFORE deletion (so we can recalculate after)
+    const affectedGameweeks = await prisma.playerPoints.findMany({
+      where: { playerId },
+      select: { gameweekId: true },
+      distinct: ["gameweekId"],
+    });
+
+    const gameweekIds = affectedGameweeks.map((pp) => pp.gameweekId);
+
+    // Delete in order to respect foreign key constraints
+    // 1. Delete PlayerPoints first
+    await prisma.playerPoints.deleteMany({
+      where: { playerId },
+    });
+
+    // 2. Delete ScoreEvents (has RESTRICT constraint, must delete first)
+    await prisma.scoreEvent.deleteMany({
+      where: { playerId },
+    });
+
+    // 3. SquadSlots will auto-set playerId to null (SET NULL constraint)
+    // But we can explicitly clear them for cleanliness
+    await prisma.squadSlot.updateMany({
+      where: { playerId },
+      data: { playerId: null },
+    });
+
+    // 4. Delete the player
+    await prisma.player.delete({
+      where: { id: playerId },
+    });
+
+    // Recalculate scores for affected gameweeks
+    const { calculateGameweekScores } = await import("@/lib/scoring");
+    for (const gameweekId of gameweekIds) {
+      try {
+        await calculateGameweekScores(gameweekId);
+      } catch (error) {
+        console.error(`[deletePlayerAction] Error recalculating gameweek ${gameweekId}:`, error);
+      }
+    }
+
+    // Revalidate paths
+    revalidatePath("/admin/players");
+    revalidatePath("/transfers");
+    revalidatePath("/pick-team");
+    revalidatePath("/players");
+
+    return { ok: true, message: "Player deleted successfully" };
+  } catch (error) {
+    console.error("[deletePlayerAction] Error:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to delete player";
+    return { ok: false, message };
+  }
+}
+

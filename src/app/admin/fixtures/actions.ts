@@ -139,3 +139,60 @@ export async function getFixturesAction(gameweekId?: number) {
   return getFixturesWithRelations(gameweekId);
 }
 
+/**
+ * Delete a fixture and recalculate points
+ */
+export async function deleteFixtureAction(
+  fixtureId: string
+): Promise<ActionState> {
+  if (!(await isAdmin())) {
+    return { ok: false, message: "Unauthorized" };
+  }
+
+  try {
+    // Get fixture to know which gameweek to recalculate
+    const fixture = await prisma.fixture.findUnique({
+      where: { id: fixtureId },
+      select: { gameweekId: true },
+    });
+
+    if (!fixture) {
+      return { ok: false, message: "Fixture not found" };
+    }
+
+    const gameweekId = fixture.gameweekId;
+
+    // Delete in order to respect foreign key constraints
+    // 1. Delete ScoreEvents first (has RESTRICT constraint)
+    await prisma.scoreEvent.deleteMany({
+      where: { fixtureId },
+    });
+
+    // 2. Delete the fixture
+    await prisma.fixture.delete({
+      where: { id: fixtureId },
+    });
+
+    // 3. Recalculate PlayerPoints for this gameweek (removes points from deleted events)
+    const { calculatePlayerPoints } = await import("@/lib/scoring");
+    await calculatePlayerPoints(gameweekId);
+
+    // 4. Recalculate GameweekScore for this gameweek
+    const { calculateGameweekScores } = await import("@/lib/scoring");
+    await calculateGameweekScores(gameweekId);
+
+    revalidatePath("/admin/fixtures");
+    revalidatePath(`/admin/fixtures/${fixtureId}`);
+    revalidatePath(`/admin/gameweeks/${gameweekId}`);
+    revalidatePath(`/admin/gameweeks/${gameweekId}/points`);
+
+    return { ok: true, message: "Fixture deleted and points recalculated" };
+  } catch (error) {
+    console.error("[deleteFixtureAction] Error:", error);
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Failed to delete fixture",
+    };
+  }
+}
+

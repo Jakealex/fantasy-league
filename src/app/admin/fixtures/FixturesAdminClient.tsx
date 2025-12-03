@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { createFixtureAction } from "./actions";
+import { createFixtureAction, deleteFixtureAction } from "./actions";
 
 type Gameweek = {
   id: number;
@@ -43,6 +43,8 @@ export default function FixturesAdminClient({
   const [fixtures, setFixtures] = useState(initialFixtures);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [isDeleting, startDeleteTransition] = useTransition();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const formatDate = (date: Date | string): string => {
@@ -71,6 +73,28 @@ export default function FixturesAdminClient({
         setMessage(result.message || "Failed to create fixture");
       }
       setTimeout(() => setMessage(null), 3000);
+    });
+  };
+
+  const handleDelete = async (fixtureId: string, fixtureLabel: string) => {
+    if (!confirm(`Are you sure you want to delete "${fixtureLabel}"? This will delete all score events and recalculate points for the gameweek. This action cannot be undone.`)) {
+      return;
+    }
+
+    setDeletingId(fixtureId);
+    startDeleteTransition(async () => {
+      const result = await deleteFixtureAction(fixtureId);
+      if (result.ok) {
+        setMessage("Fixture deleted and points recalculated!");
+        // Remove from local state
+        setFixtures((prev) => prev.filter((f) => f.id !== fixtureId));
+        // Refresh page to get updated data
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        setMessage(result.message || "Failed to delete fixture");
+      }
+      setTimeout(() => setMessage(null), 3000);
+      setDeletingId(null);
     });
   };
 
@@ -229,12 +253,21 @@ export default function FixturesAdminClient({
                               )}
                             </div>
                           </div>
-                          <Link
-                            href={`/admin/fixtures/${fixture.id}`}
-                            className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-                          >
-                            View Details
-                          </Link>
+                          <div className="flex gap-2">
+                            <Link
+                              href={`/admin/fixtures/${fixture.id}`}
+                              className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                            >
+                              View Details
+                            </Link>
+                            <button
+                              onClick={() => handleDelete(fixture.id, `${fixture.homeTeam} vs ${fixture.awayTeam}`)}
+                              disabled={isDeleting && deletingId === fixture.id}
+                              className="text-sm bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {isDeleting && deletingId === fixture.id ? "Deleting..." : "Delete"}
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
