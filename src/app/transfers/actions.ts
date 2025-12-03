@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getCurrentGameweek } from "@/lib/gameweek";
 import { getCurrentUser } from "@/lib/auth";
+import { updatePlayerOwnershipPct } from "@/lib/player-stats";
 import type { Player } from "@/types/fantasy";
 
 export type ActionState = { ok: boolean; message: string };
@@ -279,6 +280,16 @@ export async function confirmTransfersAction(
       "teamId",
       team.id
     );
+
+    // Update ownership percentages before revalidating paths
+    // This ensures the revalidated pages show updated % owned
+    try {
+      await updatePlayerOwnershipPct();
+      console.log("[confirmTransfers] Ownership percentages updated");
+    } catch (err) {
+      console.error("[confirmTransfers] Failed to update ownership % after transfers", err);
+      // Do not throw – let transfers still succeed
+    }
 
     revalidatePath("/transfers");
     revalidatePath("/pick-team");
