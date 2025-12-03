@@ -455,19 +455,37 @@ export default function TransfersClient({
                   </div>
                 </div>
 
+                {/* Season stats - displayed prominently */}
+                <div className="mt-2 text-xs text-gray-700 border-t pt-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span>
+                      <b>G:</b> {p.goals ?? 0}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      <b>A:</b> {p.assists ?? 0}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      <b>Pts:</b> {p.totalPoints ?? 0}
+                    </span>
+                    {p.position === "GK" && (p.cleanSheets ?? 0) > 0 && (
+                      <>
+                        <span>•</span>
+                        <span>
+                          <b>CS:</b> {p.cleanSheets ?? 0}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-xs text-gray-700">i Info</summary>
+                  <summary className="cursor-pointer text-xs text-gray-700">i More Info</summary>
                   <div className="mt-1 text-xs space-y-1">
                     <div><b>Fixture:</b> {p.nextFixture ?? "TBD"}</div>
                     <div><b>Status:</b> {p.status === "A" ? "Active" : "Injured"}</div>
-                    <div><b>Total points:</b> {p.totalPoints ?? 0}</div>
                     <div><b>Round points:</b> {p.roundPoints ?? 0}</div>
-                    <div>
-                      <b>Goals:</b> {p.goals ?? 0} • <b>Assists:</b> {p.assists ?? 0}
-                      {p.position === "GK" ? (
-                        <> • <b>Clean sheets:</b> {p.cleanSheets ?? 0}</>
-                      ) : null}
-                    </div>
                   </div>
                 </details>
 

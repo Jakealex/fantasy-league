@@ -32,20 +32,23 @@ export async function calculateGameweekScores(gameweekId: number) {
       include: { player: true },
     });
 
-    if (slots.length !== 5) {
+    // Skip only if team has no slots at all
+    if (slots.length === 0) {
       console.warn(
-        `Team "${team.name}" (${team.id}) has ${slots.length} slots instead of 5. Skipping scoring for this team.`
+        `Team "${team.name}" (${team.id}) has no slots. Skipping scoring for this team.`
       );
       continue;
     }
 
     let teamTotal = 0;
     let captainPoints = 0;
+    let playersWithPoints = 0;
 
+    // Calculate points for all assigned players (even if < 5 slots filled)
     for (const slot of slots) {
       const player = slot.player;
       if (!player) {
-        console.warn("Slot with no player:", slot.id);
+        // Skip empty slots, but continue processing the team
         continue;
       }
 
@@ -55,6 +58,7 @@ export async function calculateGameweekScores(gameweekId: number) {
 
       // Add base points to team total
       teamTotal += basePoints;
+      playersWithPoints++;
 
       // If captain, track for doubling (we'll subtract base and add double)
       if (slot.isCaptain) {
@@ -67,7 +71,8 @@ export async function calculateGameweekScores(gameweekId: number) {
       teamTotal = teamTotal - captainPoints + (captainPoints * 2);
     }
 
-    // Store score in GameweekScore table
+    // Always create/update GameweekScore, even if teamTotal is 0 or team has incomplete squad
+    // This ensures new teams get a score entry after scoring runs
     await prisma.gameweekScore.upsert({
       where: {
         teamId_gameweekId: {
@@ -78,6 +83,13 @@ export async function calculateGameweekScores(gameweekId: number) {
       update: { total: teamTotal },
       create: { teamId: team.id, gameweekId, total: teamTotal },
     });
+
+    // Log if team has incomplete squad (for debugging, but don't skip)
+    if (playersWithPoints < 5) {
+      console.log(
+        `Team "${team.name}" (${team.id}) has ${playersWithPoints} players assigned (expected 5). Score calculated: ${teamTotal}`
+      );
+    }
   }
 }
 

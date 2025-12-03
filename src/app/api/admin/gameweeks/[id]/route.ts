@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { isAdmin } from "@/lib/admin";
+import { updatePlayerSeasonStats, updatePlayerOwnershipPct } from "@/lib/player-stats";
 
 export async function PATCH(
   request: NextRequest,
@@ -27,6 +28,16 @@ export async function PATCH(
 
     const body = await request.json();
     const { deadlineAt, isCurrent, isFinished } = body;
+
+    // Check current state to detect false → true transition for isFinished
+    let wasFinished = false;
+    if (isFinished !== undefined) {
+      const currentGameweek = await prisma.gameweek.findUnique({
+        where: { id },
+        select: { isFinished: true },
+      });
+      wasFinished = currentGameweek?.isFinished ?? false;
+    }
 
     const updateData: {
       deadlineAt?: Date;
@@ -57,6 +68,21 @@ export async function PATCH(
       where: { id },
       data: updateData,
     });
+
+    // Only trigger updates on false → true transition for isFinished
+    if (isFinished !== undefined && isFinished === true && wasFinished === false) {
+      console.log(`[update-gameweek] Gameweek ${id} marked as finished. Updating player season stats...`);
+      try {
+        // Update season totals (totalPoints, goals, assists) from all finished gameweeks
+        await updatePlayerSeasonStats();
+        // Update ownership percentages
+        await updatePlayerOwnershipPct();
+        console.log(`[update-gameweek] Player stats updated successfully for gameweek ${id}.`);
+      } catch (statsError) {
+        // Log error but don't fail the request - gameweek is still updated
+        console.error(`[update-gameweek] Error updating player stats:`, statsError);
+      }
+    }
 
     return NextResponse.json({
       success: true,
