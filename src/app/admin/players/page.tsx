@@ -25,6 +25,22 @@ export default async function AdminPlayersPage() {
     ],
   });
 
-  return <PlayersAdminClient initialPlayers={players} />;
+  // Calculate stats: count, sum, then average
+  const totalPlayers = players.length;
+  const totalPrice = players.reduce((sum, p) => {
+    return sum + Number(p.price ?? 0);
+  }, 0);
+  const avgPrice = totalPlayers > 0 ? totalPrice / totalPlayers : 0;
+
+  return (
+    <PlayersAdminClient
+      initialPlayers={players}
+      initialStats={{
+        totalPlayers,
+        totalPrice,
+        avgPrice,
+      }}
+    />
+  );
 }
 

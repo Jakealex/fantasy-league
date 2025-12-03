@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { updatePlayerPriceAction, createPlayerAction, updatePlayerAction, deletePlayerAction } from "./actions";
 import { useRouter } from "next/navigation";
 
@@ -15,8 +15,14 @@ type Player = {
 
 export default function PlayersAdminClient({
   initialPlayers,
+  initialStats,
 }: {
   initialPlayers: Player[];
+  initialStats: {
+    totalPlayers: number;
+    totalPrice: number;
+    avgPrice: number;
+  };
 }) {
   const router = useRouter();
   const [players, setPlayers] = useState(initialPlayers);
@@ -46,6 +52,16 @@ export default function PlayersAdminClient({
   const teamNames = Array.from(
     new Set(players.map((p) => p.teamName))
   ).sort();
+
+  // Calculate stats: count, sum, then average (recalculated when players change)
+  const stats = useMemo(() => {
+    const count = players.length;
+    const sum = players.reduce((s, p) => {
+      return s + Number(p.price ?? 0);
+    }, 0);
+    const avg = count > 0 ? sum / count : 0;
+    return { count, sum, avg };
+  }, [players]);
 
   // Filter players
   const filteredPlayers = players.filter((player) => {
@@ -205,6 +221,19 @@ export default function PlayersAdminClient({
           {message}
         </div>
       )}
+
+      {/* Stats Summary */}
+      <section className="border rounded-xl p-4 bg-gray-50 mb-6 text-sm flex flex-col gap-2">
+        <div>
+          <span className="font-semibold">Total players:</span> {stats.count}
+        </div>
+        <div>
+          <span className="font-semibold">Sum of prices:</span> {stats.sum.toFixed(1)}
+        </div>
+        <div>
+          <span className="font-semibold">Average price:</span> {stats.avg.toFixed(2)}
+        </div>
+      </section>
 
       {/* Add Player Form */}
       <div className="mb-6 border rounded-lg p-4 bg-gray-50">
