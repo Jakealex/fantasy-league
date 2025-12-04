@@ -24,6 +24,7 @@ export default function PlayersAdminClient({
     totalPrice: number;
     avgPrice: number;
     stdev: number;
+    median: number;
     q1: number;
     q3: number;
   };
@@ -67,9 +68,9 @@ export default function PlayersAdminClient({
 
     // Extract prices and calculate statistical measures
     const priceValues = players.map((p) => Number(p.price ?? 0));
-    const { mean, stdev, q1, q3 } = computeStats(priceValues);
+    const { mean, stdev, median, q1, q3 } = computeStats(priceValues);
 
-    return { count, sum, avg, stdev, q1, q3 };
+    return { count, sum, avg, stdev, median, q1, q3 };
   }, [players]);
 
   // Filter players
@@ -241,6 +242,9 @@ export default function PlayersAdminClient({
         </div>
         <div>
           <span className="font-semibold">Average price:</span> {stats.avg.toFixed(2)}
+        </div>
+        <div>
+          <span className="font-semibold">Median:</span> {stats.median.toFixed(2)}
         </div>
         <div>
           <span className="font-semibold">Standard deviation:</span> {stats.stdev.toFixed(2)}

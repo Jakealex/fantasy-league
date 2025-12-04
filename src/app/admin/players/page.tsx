@@ -35,7 +35,7 @@ export default async function AdminPlayersPage() {
 
   // Extract prices and calculate statistical measures
   const priceValues = players.map((p) => Number(p.price ?? 0));
-  const { mean, stdev, q1, q3 } = computeStats(priceValues);
+  const { mean, stdev, median, q1, q3 } = computeStats(priceValues);
 
   return (
     <PlayersAdminClient
@@ -45,6 +45,7 @@ export default async function AdminPlayersPage() {
         totalPrice,
         avgPrice,
         stdev,
+        median,
         q1,
         q3,
       }}

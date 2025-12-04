@@ -1,22 +1,23 @@
 /**
  * Calculates statistical measures for an array of numeric values.
- * Returns mean, standard deviation (sample), Q1 (25th percentile), and Q3 (75th percentile).
+ * Returns mean, standard deviation (sample), median, Q1 (25th percentile), and Q3 (75th percentile).
  */
 export function computeStats(values: number[]): {
   mean: number;
   stdev: number;
+  median: number;
   q1: number;
   q3: number;
 } {
   // Edge case: empty array
   if (values.length === 0) {
-    return { mean: 0, stdev: 0, q1: 0, q3: 0 };
+    return { mean: 0, stdev: 0, median: 0, q1: 0, q3: 0 };
   }
 
   // Edge case: single element
   if (values.length === 1) {
     const val = values[0];
-    return { mean: val, stdev: 0, q1: val, q3: val };
+    return { mean: val, stdev: 0, median: val, q1: val, q3: val };
   }
 
   // Calculate mean
@@ -29,11 +30,14 @@ export function computeStats(values: number[]): {
   const variance = values.length > 1 ? sumSquaredDiffs / (values.length - 1) : 0;
   const stdev = Math.sqrt(variance);
 
-  // Calculate Q1 and Q3 using median-of-halves approach
   // Sort array ascending (don't mutate original)
   const sorted = [...values].sort((a, b) => a - b);
   const n = sorted.length;
 
+  // Calculate median
+  const medianValue = median(sorted);
+
+  // Calculate Q1 and Q3 using median-of-halves approach
   let q1: number;
   let q3: number;
 
@@ -59,7 +63,7 @@ export function computeStats(values: number[]): {
     q3 = median(upperHalf);
   }
 
-  return { mean, stdev, q1, q3 };
+  return { mean, stdev, median: medianValue, q1, q3 };
 }
 
 /**
