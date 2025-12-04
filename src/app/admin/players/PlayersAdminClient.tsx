@@ -3,6 +3,7 @@
 import { useState, useTransition, useMemo } from "react";
 import { updatePlayerPriceAction, createPlayerAction, updatePlayerAction, deletePlayerAction } from "./actions";
 import { useRouter } from "next/navigation";
+import { computeStats } from "@/lib/stats";
 
 type Player = {
   id: string;
@@ -22,6 +23,9 @@ export default function PlayersAdminClient({
     totalPlayers: number;
     totalPrice: number;
     avgPrice: number;
+    stdev: number;
+    q1: number;
+    q3: number;
   };
 }) {
   const router = useRouter();
@@ -53,14 +57,19 @@ export default function PlayersAdminClient({
     new Set(players.map((p) => p.teamName))
   ).sort();
 
-  // Calculate stats: count, sum, then average (recalculated when players change)
+  // Calculate stats: count, sum, average, stdev, q1, q3 (recalculated when players change)
   const stats = useMemo(() => {
     const count = players.length;
     const sum = players.reduce((s, p) => {
       return s + Number(p.price ?? 0);
     }, 0);
     const avg = count > 0 ? sum / count : 0;
-    return { count, sum, avg };
+
+    // Extract prices and calculate statistical measures
+    const priceValues = players.map((p) => Number(p.price ?? 0));
+    const { mean, stdev, q1, q3 } = computeStats(priceValues);
+
+    return { count, sum, avg, stdev, q1, q3 };
   }, [players]);
 
   // Filter players
@@ -232,6 +241,15 @@ export default function PlayersAdminClient({
         </div>
         <div>
           <span className="font-semibold">Average price:</span> {stats.avg.toFixed(2)}
+        </div>
+        <div>
+          <span className="font-semibold">Standard deviation:</span> {stats.stdev.toFixed(2)}
+        </div>
+        <div>
+          <span className="font-semibold">Q1 (25th percentile):</span> {stats.q1.toFixed(2)}
+        </div>
+        <div>
+          <span className="font-semibold">Q3 (75th percentile):</span> {stats.q3.toFixed(2)}
         </div>
       </section>
 
