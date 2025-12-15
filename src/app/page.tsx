@@ -155,68 +155,85 @@ function LoggedInHome({
 }
 
 export default async function HomePage() {
-  const user = await getCurrentUser();
+  // Get user with error handling - don't crash if database is unreachable
+  let user = null;
+  try {
+    user = await getCurrentUser();
+  } catch (error) {
+    console.error('[HomePage] Error getting user (database may be unreachable):', error);
+    // Continue with null user (shows logged out home)
+  }
 
   if (!user) {
     return <LoggedOutHome />;
   }
 
-  const team = await prisma.team.findFirst({
-    where: { userId: user.id },
-  });
-
-  if (!team) {
-    return (
-      <div className="max-w-2xl mx-auto mt-8 space-y-4">
-        <h1 className="text-2xl font-bold">Welcome, {user.firstName || user.email}</h1>
-        <p className="text-sm text-gray-600">
-          You don&apos;t have a team yet. Create your squad to join the fun.
-        </p>
-        <Link
-          href="/pick-team"
-          className="inline-block px-4 py-2 rounded bg-blue-600 text-white text-sm"
-        >
-          Go to Pick Team
-        </Link>
-      </div>
-    );
-  }
-
-  const currentGameweek = await getCurrentGameweek();
-  const finishedGws = await prisma.gameweek.findMany({
-    where: { isFinished: true },
-    orderBy: { number: "asc" },
-  });
-
-  const finishedIds = finishedGws.map((gw: { id: number }) => gw.id);
-
-  const scores =
-    finishedIds.length > 0
-      ? await prisma.gameweekScore.findMany({
-          where: {
-            teamId: team.id,
-            gameweekId: { in: finishedIds },
-          },
-          include: { gameweek: true },
-        })
-      : [];
-
+  // All database queries need error handling
+  let team = null;
+  let currentGameweek = null;
   let totalPoints = 0;
   let lastGwPoints = 0;
-  let lastGwNumber: number | null = null;
 
-  for (const s of scores) {
-    totalPoints += s.total;
-    if (lastGwNumber === null || s.gameweek.number > lastGwNumber) {
-      lastGwNumber = s.gameweek.number;
-      lastGwPoints = s.total;
+  try {
+    team = await prisma.team.findFirst({
+      where: { userId: user.id },
+    });
+
+    if (!team) {
+      return (
+        <div className="max-w-2xl mx-auto mt-8 space-y-4">
+          <h1 className="text-2xl font-bold">Welcome, {user.firstName || user.email}</h1>
+          <p className="text-sm text-gray-600">
+            You don&apos;t have a team yet. Create your squad to join the fun.
+          </p>
+          <Link
+            href="/pick-team"
+            className="inline-block px-4 py-2 rounded bg-blue-600 text-white text-sm"
+          >
+            Go to Pick Team
+          </Link>
+        </div>
+      );
     }
+
+    currentGameweek = await getCurrentGameweek();
+    const finishedGws = await prisma.gameweek.findMany({
+      where: { isFinished: true },
+      orderBy: { number: "asc" },
+    });
+
+    const finishedIds = finishedGws.map((gw: { id: number }) => gw.id);
+
+    const scores =
+      finishedIds.length > 0
+        ? await prisma.gameweekScore.findMany({
+            where: {
+              teamId: team.id,
+              gameweekId: { in: finishedIds },
+            },
+            include: { gameweek: true },
+          })
+        : [];
+
+    let lastGwNumber: number | null = null;
+
+    for (const s of scores) {
+      totalPoints += s.total;
+      if (lastGwNumber === null || s.gameweek.number > lastGwNumber) {
+        lastGwNumber = s.gameweek.number;
+        lastGwPoints = s.total;
+      }
+    }
+  } catch (error) {
+    console.error('[HomePage] Error fetching data (database may be unreachable):', error);
+    // Show logged in home with default values (0 points) if database fails
+    // This allows the page to render even if database is down
   }
 
   return (
     <LoggedInHome
       user={user}
-      team={team}
+      team={team || { name: "Your Team" }} // Fallback if team fetch failed
       currentGameweek={currentGameweek}
       totalPoints={totalPoints}
       lastGwPoints={lastGwPoints}

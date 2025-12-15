@@ -17,19 +17,15 @@ const links = [
 export default async function Nav() {
   noStore(); // Prevent any caching
   
-  // Force execution - log immediately
-  const timestamp = new Date().toISOString();
-  console.error('[NAV-DEBUG] Component executing at:', timestamp);
-  console.log('[NAV-DEBUG] Component executing at:', timestamp);
-  
-  const user = await getCurrentUser();
-  
-  // Debug logging for Vercel logs - use both console.log and console.error
-  const userInfo = user ? { id: user.id, email: user.email, firstName: user.firstName } : 'null';
-  console.error('[NAV-DEBUG] User:', userInfo);
-  console.log('[NAV-DEBUG] User:', userInfo);
-  console.error('[NAV-DEBUG] Will render:', user ? 'LOGGED IN' : 'LOGGED OUT');
-  console.log('[NAV-DEBUG] Will render:', user ? 'LOGGED IN' : 'LOGGED OUT');
+  // Get user with error handling - don't crash if database is unreachable
+  let user = null;
+  try {
+    user = await getCurrentUser();
+  } catch (error) {
+    // Log error but don't crash the page
+    console.error('[NAV] Error getting user (database may be unreachable):', error);
+    // Continue with null user (shows login/signup links)
+  }
 
   return (
     <nav className="flex gap-6 items-center p-4 border-b">
