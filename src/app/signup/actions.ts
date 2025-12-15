@@ -174,7 +174,7 @@ export async function signupAction(form: {
         name: teamName,
         userId: user.id,
         leagueId: overall.id, // Use overall league as primary league
-        budget: 34,
+        budget: 37,
       },
     });
 
