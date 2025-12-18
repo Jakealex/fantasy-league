@@ -11,7 +11,7 @@ import type { Player } from "@/types/fantasy";
 export type ActionState = { ok: boolean; message: string };
 export type ConfirmActionState = { ok: boolean; message: string };
 
-const BASE_BUDGET = 41; // keep in sync with page.tsx
+const BASE_BUDGET = 46; // keep in sync with page.tsx
 const MAX_FROM_CLUB = 3;
 const REQUIRED_SLOT_LABELS = ["GK1", "OUT1", "OUT2", "OUT3", "OUT4"] as const;
 

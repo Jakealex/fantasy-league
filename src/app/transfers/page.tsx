@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import TransfersClient from "./transfer-clients";
 import type { Player as UiPlayer, SquadSlot as UiSquadSlot } from "@/types/fantasy";
 
-const BASE_BUDGET = 41;
+const BASE_BUDGET = 46;
 
 // Map DB player -> UI player (typed to your UI unions)
 function toUiPlayer(p: {
@@ -76,7 +76,7 @@ export default async function Page() {
 
 if (!team) {
   team = await prisma.team.create({
-    data: { name: "Admin XI", userId: user.id, leagueId: league.id, budget: 41 },
+    data: { name: "Admin XI", userId: user.id, leagueId: league.id, budget: 46 },
   });
 
   // ensure empty slots exist
