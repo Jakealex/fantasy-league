@@ -55,7 +55,7 @@ async function getTeamForCurrentUser() {
   }
 
   const created = await prisma.team.create({
-    data: { name: "Admin XI", userId: user.id, leagueId: league.id, budget: 46 },
+    data: { name: "Admin XI", userId: user.id, leagueId: league.id, budget: 50 },
   });
 
   await ensureRequiredSlots(created.id);
